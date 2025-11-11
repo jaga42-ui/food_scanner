@@ -29,31 +29,56 @@ button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 150px; }
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgAZKOHIShAUqbZxQUEmoB0yH6HDuN3JvyqP460HvyVsJ3Lab_3newCpmImMJeFCY/exec";
 
 let meal = "";
+let scanLock = false;
+let scanner;
 
 function setMeal(m) {
   meal = m;
   document.getElementById("mealDisplay").innerText = m.toUpperCase();
 }
 
+function startScanner() {
+  scanner = new Html5Qrcode("qr-reader");
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    onScanSuccess
+  );
+}
+
 function onScanSuccess(qrMessage) {
+  if (scanLock) return;
+  scanLock = true;
+
   if (!meal) {
     alert("Select meal before scanning.");
+    scanLock = false;
     return;
   }
+
+  // STOP CAMERA immediately after scanning
+  scanner.stop();
 
   fetch(`${SCRIPT_URL}?id=${qrMessage}&meal=${meal}`)
     .then(res => res.text())
     .then(t => {
       let r = document.getElementById("result");
+
       if (t == "ALLOW") { r.style.color = "green"; r.innerText = "✔ ALLOWED"; }
       else if (t == "DENY") { r.style.color = "red"; r.innerText = "✖ ALREADY TAKEN"; }
       else if (t == "INVALID") { r.style.color = "gray"; r.innerText = "⚠ INVALID GUEST"; }
       else { r.style.color = "black"; r.innerText = t; }
+    })
+    .finally(() => {
+      // Restart camera after 1.5 sec
+      setTimeout(() => {
+        scanLock = false;
+        startScanner();
+      }, 1500);
     });
 }
 
-const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
-scanner.render(onScanSuccess);
+startScanner();
 </script>
 
 </body>
