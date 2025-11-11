@@ -4,12 +4,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guest Food Scanner</title>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
 <style>
-body { font-family: Arial; text-align: center; padding: 10px; }
-button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 150px; }
-#result { margin-top: 20px; font-size: 34px; font-weight: bold; }
+body { font-family: Arial; text-align: center; padding: 15px; }
+button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 170px; }
+#result { margin-top: 20px; font-size: 32px; font-weight: bold; }
 </style>
 </head>
+
 <body>
 
 <h2>Guest Food Scanner</h2>
@@ -22,7 +24,7 @@ button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 150px; }
 
 <p>Selected Meal: <span id="mealDisplay">None</span></p>
 
-<div id="qr-reader" style="width: 320px; margin:auto;"></div>
+<div id="qr-reader" style="width: 330px; margin:auto;"></div>
 <p id="result"></p>
 
 <script>
@@ -37,6 +39,7 @@ function setMeal(m) {
   document.getElementById("mealDisplay").innerText = m.toUpperCase();
 }
 
+// Start Scanner
 function startScanner() {
   scanner = new Html5Qrcode("qr-reader");
   scanner.start(
@@ -46,6 +49,7 @@ function startScanner() {
   );
 }
 
+// Scan Handler
 function onScanSuccess(qrMessage) {
   if (scanLock) return;
   scanLock = true;
@@ -56,7 +60,7 @@ function onScanSuccess(qrMessage) {
     return;
   }
 
-  // STOP CAMERA immediately after scanning
+  // Stop camera to avoid multiple scans
   scanner.stop();
 
   fetch(`${SCRIPT_URL}?id=${qrMessage}&meal=${meal}`)
@@ -64,20 +68,33 @@ function onScanSuccess(qrMessage) {
     .then(t => {
       let r = document.getElementById("result");
 
-      if (t == "ALLOW") { r.style.color = "green"; r.innerText = "✔ ALLOWED"; }
-      else if (t == "DENY") { r.style.color = "red"; r.innerText = "✖ ALREADY TAKEN"; }
-      else if (t == "INVALID") { r.style.color = "gray"; r.innerText = "⚠ INVALID GUEST"; }
-      else { r.style.color = "black"; r.innerText = t; }
+      if (t == "ALLOW") { 
+        r.style.color = "green"; 
+        r.innerText = "✔ ALLOWED"; 
+      }
+      else if (t == "DENY") { 
+        r.style.color = "red"; 
+        r.innerText = "✖ ALREADY TAKEN"; 
+      }
+      else if (t == "INVALID") { 
+        r.style.color = "gray"; 
+        r.innerText = "⚠ INVALID GUEST"; 
+      }
+      else { 
+        r.style.color = "black"; 
+        r.innerText = t; 
+      }
     })
     .finally(() => {
-      // Restart camera after 1.5 sec
+      // Restart scanner after short delay
       setTimeout(() => {
         scanLock = false;
         startScanner();
-      }, 1500);
+      }, 1200);
     });
 }
 
+// Initialize
 startScanner();
 </script>
 
