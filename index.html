@@ -26,37 +26,34 @@ button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 150px; }
 <p id="result"></p>
 
 <script>
-function doGet(e) {
-  var id = (e.parameter.id || "").trim();
-  var meal = (e.parameter.meal || "").trim().toLowerCase();
-  if (!id || !meal) return ContentService.createTextOutput("INVALID");
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgAZKOHIShAUqbZxQUEmoB0yH6HDuN3JvyqP460HvyVsJ3Lab_3newCpmImMJeFCY/exec";
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var guests = ss.getSheetByName("Guests");
-  var logs = ss.getSheetByName("Logs");
+let meal = "";
 
-  // -------- VALIDATE GUEST --------
-  var guestData = guests.getRange(2, 1, guests.getLastRow() - 1, 1).getValues().flat();
-  if (guestData.indexOf(id) === -1) {
-    return ContentService.createTextOutput("INVALID");
-  }
-
-  // -------- DATE + MEAL UNIQUE CHECK --------
-  var today = Utilities.formatDate(new Date(), "Asia/Kolkata", "yyyy-MM-dd");
-  var logData = logs.getDataRange().getValues();
-
-  for (var i = 1; i < logData.length; i++) {
-    if (logData[i][0] == today && logData[i][1] == id && logData[i][2] == meal) {
-      return ContentService.createTextOutput("DENY"); // already taken
-    }
-  }
-
-  // -------- APPEND ONE UNIQUE ENTRY ONLY --------
-  logs.appendRow([today, id, meal, new Date()]);
-
-  return ContentService.createTextOutput("ALLOW");
+function setMeal(m) {
+  meal = m;
+  document.getElementById("mealDisplay").innerText = m.toUpperCase();
 }
 
+function onScanSuccess(qrMessage) {
+  if (!meal) {
+    alert("Select meal before scanning.");
+    return;
+  }
+
+  fetch(`${SCRIPT_URL}?id=${qrMessage}&meal=${meal}`)
+    .then(res => res.text())
+    .then(t => {
+      let r = document.getElementById("result");
+      if (t == "ALLOW") { r.style.color = "green"; r.innerText = "✔ ALLOWED"; }
+      else if (t == "DENY") { r.style.color = "red"; r.innerText = "✖ ALREADY TAKEN"; }
+      else if (t == "INVALID") { r.style.color = "gray"; r.innerText = "⚠ INVALID GUEST"; }
+      else { r.style.color = "black"; r.innerText = t; }
+    });
+}
+
+const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
+scanner.render(onScanSuccess);
 </script>
 
 </body>
