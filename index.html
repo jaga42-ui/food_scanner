@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guest Food Scanner</title>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<style>
+body { font-family: Arial; text-align: center; padding: 10px; }
+button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 150px; }
+#result { margin-top: 20px; font-size: 34px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h2>Guest Food Scanner</h2>
+
+<div>
+  <button onclick="setMeal('breakfast')">Breakfast</button>
+  <button onclick="setMeal('lunch')">Lunch</button>
+  <button onclick="setMeal('dinner')">Dinner</button>
+</div>
+
+<p>Selected Meal: <span id="mealDisplay">None</span></p>
+
+<div id="qr-reader" style="width: 320px; margin:auto;"></div>
+<p id="result"></p>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgAZKOHIShAUqbZxQUEmoB0yH6HDuN3JvyqP460HvyVsJ3Lab_3newCpmImMJeFCY/exec";
+
+let meal = "";
+
+function setMeal(m) {
+  meal = m;
+  document.getElementById("mealDisplay").innerText = m.toUpperCase();
+}
+
+function onScanSuccess(qrMessage) {
+  if (!meal) {
+    alert("Select meal before scanning.");
+    return;
+  }
+
+  fetch(`${SCRIPT_URL}?id=${qrMessage}&meal=${meal}`)
+    .then(res => res.text())
+    .then(t => {
+      let r = document.getElementById("result");
+      if (t == "ALLOW") { r.style.color = "green"; r.innerText = "✔ ALLOWED"; }
+      else if (t == "DENY") { r.style.color = "red"; r.innerText = "✖ ALREADY TAKEN"; }
+      else if (t == "INVALID") { r.style.color = "gray"; r.innerText = "⚠ INVALID GUEST"; }
+      else { r.style.color = "black"; r.innerText = t; }
+    });
+}
+
+const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
+scanner.render(onScanSuccess);
+</script>
+
+</body>
+</html>
