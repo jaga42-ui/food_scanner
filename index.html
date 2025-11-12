@@ -10,21 +10,21 @@
 
 <body class="bg-gray-50 flex flex-col items-center min-h-screen font-[Inter]">
 
-  <div class="max-w-3xl w-full p-6 mt-8 bg-white shadow-2xl rounded-3xl border-t-8 border-blue-600">
-    <h1 class="text-3xl font-extrabold text-blue-700 text-center mb-2">ORC Meal Tracker</h1>
-    <p class="text-center text-gray-600 mb-4" id="current-mode">Mode: BREAKFAST</p>
+  <div class="max-w-md w-full mt-8 p-6 bg-white shadow-2xl rounded-3xl border-t-8 border-blue-600">
+    <h1 class="text-3xl font-extrabold text-blue-700 text-center mb-3">ORC Meal Tracker</h1>
+    <p id="meal-mode" class="text-center text-gray-600 mb-4">Mode: BREAKFAST</p>
 
-    <!-- Mode buttons -->
+    <!-- Meal Mode Buttons -->
     <div class="flex justify-center gap-2 mb-4">
-      <button id="breakfast-btn" class="mode-btn bg-blue-600 text-white px-4 py-2 rounded-lg shadow">Breakfast</button>
-      <button id="lunch-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-blue-100">Lunch</button>
-      <button id="dinner-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-blue-100">Dinner</button>
+      <button id="breakfast-btn" class="mode-btn bg-blue-600 text-white px-4 py-2 rounded-lg">Breakfast</button>
+      <button id="lunch-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Lunch</button>
+      <button id="dinner-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Dinner</button>
     </div>
 
     <!-- QR Scanner -->
-    <div id="reader" class="w-full max-w-md mx-auto border-4 border-blue-500 rounded-2xl shadow-lg overflow-hidden" style="height:350px;"></div>
-    <p id="status" class="text-center text-gray-600 mt-3">Initializing camera...</p>
-    <div id="feedback" class="mt-4 text-center text-lg font-semibold"></div>
+    <div id="reader" class="w-full border-4 border-blue-500 rounded-2xl overflow-hidden" style="height:350px;"></div>
+    <p id="status" class="text-center text-gray-600 mt-2">Starting camera...</p>
+    <div id="feedback" class="mt-4 text-center text-lg font-bold"></div>
   </div>
 
   <script type="module">
@@ -32,7 +32,7 @@
     import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    // 🔥 Your Firebase Config
+    // ✅ Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
       authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -43,58 +43,37 @@
       measurementId: "G-H4X37NMPRH"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
     await signInAnonymously(auth);
 
-    // Global state
-    let currentMode = "breakfast";
-    const readerEl = document.getElementById("reader");
+    const reader = new Html5Qrcode("reader");
+    let currentMeal = "breakfast";
+
     const statusEl = document.getElementById("status");
     const feedbackEl = document.getElementById("feedback");
-    const html5QrCode = new Html5Qrcode("reader");
 
-    // Helpers
-    function getDateKey() {
-      const d = new Date();
-      return d.toISOString().split("T")[0]; // YYYY-MM-DD
+    function todayKey() {
+      return new Date().toISOString().split("T")[0];
     }
 
-    function getTime() {
+    function nowTime() {
       return new Date().toLocaleTimeString();
     }
 
-    function showMessage(msg, type = "info") {
+    function showMessage(msg, type) {
       feedbackEl.textContent = msg;
       feedbackEl.className = "mt-4 text-center text-lg font-bold";
-      if (type === "success") feedbackEl.classList.add("text-green-600");
-      else if (type === "error") feedbackEl.classList.add("text-red-600");
-      else feedbackEl.classList.add("text-blue-600");
-      setTimeout(() => (feedbackEl.textContent = ""), 4000);
+      feedbackEl.classList.add(type === "success" ? "text-green-600" : "text-red-600");
+      setTimeout(() => (feedbackEl.textContent = ""), 3000);
     }
 
-    async function startScanner() {
-      try {
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras.length) throw new Error("No camera found");
-        const backCam = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
-        await html5QrCode.start(backCam.id, { fps: 10, qrbox: { width: 250, height: 250 } }, onScan);
-        statusEl.textContent = "Camera ready — scan your QR code.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Camera access failed. Please allow permission.";
-      }
-    }
-
-    async function onScan(decodedText) {
-      await html5QrCode.stop();
-      statusEl.textContent = "Processing...";
-
+    async function onScanSuccess(decodedText) {
+      await reader.stop();
+      statusEl.textContent = "Checking entry...";
       const id = decodedText.trim().toUpperCase();
-      const date = getDateKey();
-      const time = getTime();
+      const date = todayKey();
 
       const docRef = doc(db, "meal_records", id);
       const snap = await getDoc(docRef);
@@ -102,55 +81,63 @@
       if (snap.exists()) {
         const data = snap.data();
         const meals = data.meals || {};
+        const mealDateKey = `${currentMeal}_date`;
+        const mealTimeKey = `${currentMeal}_time`;
 
-        const dateKey = `${currentMode}_date`;
-        const timeKey = `${currentMode}_time`;
-
-        if (meals[dateKey] === date) {
-          showMessage(`${id} already claimed ${currentMode} today at ${meals[timeKey]}`, "error");
-          statusEl.textContent = "Scan next person.";
-          startScanner();
-          return;
+        if (meals[mealDateKey] === date) {
+          showMessage("❌ Already Taken", "error");
+        } else {
+          await updateDoc(docRef, {
+            meals: { ...meals, [mealDateKey]: date, [mealTimeKey]: nowTime() },
+            lastUpdate: new Date()
+          });
+          showMessage("✅ Allowed", "success");
         }
-
-        await updateDoc(docRef, {
-          meals: { ...meals, [dateKey]: date, [timeKey]: time },
-          lastUpdate: new Date()
-        });
-        showMessage(`${id} checked in for ${currentMode}!`, "success");
       } else {
-        const dateKey = `${currentMode}_date`;
-        const timeKey = `${currentMode}_time`;
         await setDoc(docRef, {
-          name: `Participant ${id}`,
-          meals: { [dateKey]: date, [timeKey]: time },
-          registeredAt: new Date(),
-          lastUpdate: new Date()
+          id,
+          meals: { [`${currentMeal}_date`]: date, [`${currentMeal}_time`]: nowTime() },
+          registeredAt: new Date()
         });
-        showMessage(`New participant ${id} added and checked in!`, "success");
+        showMessage("✅ Allowed (New Entry)", "success");
       }
 
-      statusEl.textContent = "Ready for next scan.";
+      statusEl.textContent = "Ready for next scan";
+      setTimeout(startScanner, 2000);
+    }
+
+    async function startScanner() {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras.length) throw new Error("No camera found");
+        const backCamera = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
+        await reader.start(
+          backCamera.id,
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess
+        );
+        statusEl.textContent = "Camera ready. Scan QR code.";
+      } catch (e) {
+        statusEl.textContent = "Camera access failed: " + e.message;
+      }
+    }
+
+    function switchMode(mode) {
+      currentMeal = mode;
+      document.getElementById("meal-mode").textContent = `Mode: ${mode.toUpperCase()}`;
+      document.querySelectorAll(".mode-btn").forEach(b => {
+        b.classList.remove("bg-blue-600", "text-white");
+        b.classList.add("bg-gray-200", "text-gray-700");
+      });
+      document.getElementById(`${mode}-btn`).classList.add("bg-blue-600", "text-white");
+      reader.stop().catch(() => {});
       startScanner();
     }
 
-    // Mode switching
-    function setMode(mode) {
-      currentMode = mode;
-      document.getElementById("current-mode").textContent = `Mode: ${mode.toUpperCase()}`;
-      document.querySelectorAll(".mode-btn").forEach(btn =>
-        btn.classList.remove("bg-blue-600", "text-white", "shadow")
-      );
-      document.getElementById(`${mode}-btn`).classList.add("bg-blue-600", "text-white", "shadow");
-      html5QrCode.stop().catch(() => {});
-      startScanner();
-    }
+    document.getElementById("breakfast-btn").onclick = () => switchMode("breakfast");
+    document.getElementById("lunch-btn").onclick = () => switchMode("lunch");
+    document.getElementById("dinner-btn").onclick = () => switchMode("dinner");
 
-    document.getElementById("breakfast-btn").onclick = () => setMode("breakfast");
-    document.getElementById("lunch-btn").onclick = () => setMode("lunch");
-    document.getElementById("dinner-btn").onclick = () => setMode("dinner");
-
-    // Start up
     startScanner();
   </script>
 </body>
