@@ -3,432 +3,410 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>ORC Meal Tracker — Purple & Gray (Responsive)</title>
+  <title>ORC Meal Tracker — Purple & Gray</title>
 
-  <!-- Tailwind for utilities (we use some, but added custom CSS for responsiveness) -->
+  <!-- Tailwind for utilities -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML5 QR Code -->
+  <!-- html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- XLSX -->
+  <!-- xlsx -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Firebase v8 (non-module) for local/gh-pages friendly usage -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
   <style>
-    :root{
-      --bg1:#1f1b2e;
-      --bg2:#3b2a57;
-      --muted:#9aa0a6;
-      --accent:#8b5cf6;
-      --accent-2:#6d28d9;
+    :root {
+      --bg1: #1f1b2e;
+      --bg2: #36284a;
+      --muted: #9aa0a6;
+      --accent: #9b5cf6;
+      --accent-2: #6d28d9;
+      --card-bg: rgba(255,255,255,0.02);
     }
-
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8;-webkit-font-smoothing:antialiased}
-    .page {
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-      box-sizing:border-box;
-    }
-
-    /* Card */
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8}
+    .container {max-width:980px;margin:18px auto;padding:18px;box-sizing:border-box}
     .card {
-      width:100%;
-      max-width:960px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      border-radius:14px;
-      padding:18px;
-      box-shadow:0 10px 40px rgba(0,0,0,0.45);
-      border:1px solid rgba(255,255,255,0.04);
-      box-sizing:border-box;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 12px 40px rgba(2,6,23,0.6);
     }
 
-    .head {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:12px;
-    }
-    .brand {
-      display:flex;
-      flex-direction:column;
-    }
-    .brand h1{margin:0;color:var(--accent);font-size:20px}
-    .brand p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    header {display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header h1{color:var(--accent);margin:0;font-size:20px}
+    header p{margin:0;color:var(--muted);font-size:13px}
 
-    /* layout: left = controls, right = camera */
-    .layout {
-      display:grid;
-      grid-template-columns: 360px 1fr;
-      gap:18px;
-      align-items:start;
-    }
-
-    /* Left panel controls */
-    .controls {
-      background:transparent;
-      padding:8px;
-      border-radius:10px;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-    }
-
-    .meals {
-      display:flex;
-      gap:8px;
-    }
+    .layout { display:grid; grid-template-columns: 360px 1fr; gap:18px; margin-top:12px; align-items:start; }
+    .controls { display:flex; flex-direction:column; gap:12px; }
+    .meals { display:flex; gap:10px; }
     .meal-btn {
-      flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
-      background:transparent;color:#edf2ff;font-weight:700;cursor:pointer;
-      transition:all .14s;
+      flex:1; padding:10px; border-radius:12px; border:1px solid rgba(255,255,255,0.03);
+      background:transparent;color:#f5f7ff;font-weight:700; cursor:pointer; transition:all .12s;
     }
-    .meal-btn:hover{transform:translateY(-3px)}
-    .meal-btn.active{
-      background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;box-shadow:0 10px 30px rgba(109,40,217,0.18);
+    .meal-btn:hover { transform:translateY(-3px) }
+    .meal-btn.active {
+      background: linear-gradient(90deg,var(--accent),var(--accent-2)); color:white; box-shadow:0 10px 30px rgba(109,40,217,0.18);
     }
 
-    .file-row {
-      display:flex;gap:8px;align-items:center;
-      background:rgba(255,255,255,0.02);
-      padding:10px;border-radius:10px;border:1px dashed rgba(255,255,255,0.03);
-    }
-    .file-row .txt {flex:1;color:var(--muted);font-size:13px}
-    .file-row input[type=file]{color:inherit}
+    .file-box { display:flex; gap:10px; align-items:center; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.03); background:var(--card-bg) }
+    .file-box .note { color:var(--muted); font-size:13px; flex:1 }
 
-    .btn-row {display:flex;gap:8px;flex-wrap:wrap}
+    .btn-row { display:flex; gap:10px; flex-wrap:wrap }
     .btn {
-      padding:10px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700;color:white;
-      display:inline-flex;align-items:center;gap:8px;justify-content:center;
-      min-width:110px;
+      padding:10px 14px; border-radius:12px; border:0; cursor:pointer; font-weight:700; color:white; min-width:120px;
+      box-shadow:0 8px 20px rgba(6,6,12,0.45); transition:transform .08s;
     }
-    .btn-start{background:linear-gradient(90deg,#10b981,#059669)}
-    .btn-stop{background:linear-gradient(90deg,#ef4444,#dc2626)}
-    .btn-download{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+    .btn:active{ transform:translateY(1px) }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; box-shadow:none }
 
-    .small {font-size:12px;color:var(--muted)}
+    .btn-start { background: linear-gradient(90deg,#10b981,#059669) }
+    .btn-stop  { background: linear-gradient(90deg,#ef4444,#dc2626) }
+    .btn-download { background: linear-gradient(90deg,var(--accent),var(--accent-2)) }
 
-    /* Camera area */
-    .camera-card {
-      border-radius:12px;
-      padding:8px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.01));
-      border:1px solid rgba(255,255,255,0.03);
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      align-items:stretch;
+    .camera {
+      border-radius:12px; padding:10px; border:1px solid rgba(255,255,255,0.03); background:linear-gradient(180deg,#071427,#0b1220);
+      display:flex; flex-direction:column; gap:12px;
     }
-    #reader {
-      width:100%;
-      height:420px;
-      border-radius:10px;
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:linear-gradient(180deg,#071427,#0b1220);
-      border:4px solid rgba(255,255,255,0.04);
-    }
+    #reader { width:100%; height:420px; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; color:#cfe7ff; border:4px solid rgba(255,255,255,0.04) }
 
-    .status-card {
-      border-radius:10px;padding:10px;background:rgba(255,255,255,0.02);text-align:center;
-    }
-    .big-msg {font-weight:800;font-size:20px}
+    .status { background: rgba(255,255,255,0.02); padding:10px; border-radius:10px; text-align:center; color:var(--muted) }
+    .bigmsg { font-weight:800; font-size:20px; margin-top:6px }
 
-    /* responsive: stack controls on top for narrow screens */
+    /* Download popup modal */
+    .modal-backdrop { position:fixed; left:0; right:0; top:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:60 }
+    .modal { background:white; color:#0b1220; border-radius:12px; padding:16px; width:320px; box-shadow:0 8px 40px rgba(2,6,23,0.5) }
+    .modal h3{ margin:0 0 8px 0; color:#111827 }
+    .modal .opt { display:flex; align-items:center; gap:8px; margin:8px 0; }
+
+    /* responsive */
     @media (max-width:880px) {
       .layout { grid-template-columns: 1fr; }
-      #reader { height:320px; }
-      .brand { align-items:flex-start }
+      #reader { height:320px }
     }
     @media (max-width:480px) {
-      .card { padding:12px; border-radius:10px; }
-      #reader { height:260px; }
-      .meal-btn{padding:9px;font-size:14px}
-      .btn{min-width:unset;padding:9px 10px}
-      .big-msg{font-size:18px}
+      #reader { height:260px }
+      .btn { min-width:unset; padding:9px 10px }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="card" role="application" aria-label="Meal Tracker">
-      <div class="head">
-        <div class="brand">
+  <div class="container">
+    <div class="card">
+      <header>
+        <div>
           <h1>ORC Meal Tracker</h1>
-          <p>Upload Excel → Scan QR → Allowed / Already Taken</p>
+          <p>Upload Excel → Scan QR → Allowed / Already Taken — then Download DB</p>
         </div>
-        <div class="small">Firestore: <strong>meal_records</strong></div>
-      </div>
+        <div style="text-align:right;color:var(--muted);font-size:13px">Collection: <strong>meal_records</strong></div>
+      </header>
 
-      <div class="layout" aria-live="polite">
-        <!-- LEFT: controls -->
-        <div class="controls" aria-hidden="false">
-          <div>
-            <div class="meals" role="tablist">
-              <button id="breakfastBtn" class="meal-btn active" aria-pressed="true">Breakfast</button>
-              <button id="lunchBtn" class="meal-btn" aria-pressed="false">Lunch</button>
-              <button id="dinnerBtn" class="meal-btn" aria-pressed="false">Dinner</button>
-            </div>
+      <div class="layout">
+        <!-- CONTROLS -->
+        <div class="controls">
+          <div class="meals" role="tablist" aria-label="Meal selector">
+            <button id="breakfastBtn" class="meal-btn active" aria-pressed="true">Breakfast</button>
+            <button id="lunchBtn" class="meal-btn" aria-pressed="false">Lunch</button>
+            <button id="dinnerBtn" class="meal-btn" aria-pressed="false">Dinner</button>
           </div>
 
-          <div class="file-row" role="group" aria-label="Excel upload">
-            <div class="txt">Upload Excel (first sheet with ID column)</div>
+          <div class="file-box" aria-label="Excel upload">
+            <div class="note">Upload Excel (first sheet has ID column)</div>
             <input id="excelFile" type="file" accept=".xlsx,.xls" />
           </div>
 
-          <div class="btn-row">
+          <div class="btn-row" style="margin-top:6px">
             <button id="startBtn" class="btn btn-start" disabled>Start Scanning</button>
             <button id="stopBtn" class="btn btn-stop" disabled>Stop</button>
-            <button id="downloadBtn" class="btn btn-download">Download Report</button>
+            <button id="downloadBtn" class="btn btn-download">Download Database</button>
           </div>
 
-          <div id="fileStatus" class="small" style="margin-top:8px">No file loaded</div>
+          <div id="fileStatus" class="status" style="margin-top:8px">No file loaded</div>
         </div>
 
-        <!-- RIGHT: camera -->
-        <div class="camera-card">
+        <!-- CAMERA -->
+        <div class="camera">
           <div id="reader">Camera preview will appear here</div>
 
-          <div class="status-card">
-            <div id="status" class="small">Upload Excel file to begin.</div>
-            <div id="message" class="big-msg mt-2" aria-live="assertive"></div>
+          <div class="status">
+            <div id="statusText">Please upload Excel to begin.</div>
+            <div id="message" class="bigmsg" aria-live="polite"></div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs
-  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+  <!-- Modal (hidden by default) -->
+  <div id="downloadModal" style="display:none;" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3>Download Database</h3>
+      <div style="font-size:13px;color:#374151">Choose which records to download:</div>
+      <div class="opt"><input type="radio" name="dlOpt" id="dlToday" value="today" checked> <label for="dlToday">Today's Records</label></div>
+      <div class="opt"><input type="radio" name="dlOpt" id="dlAll" value="all"> <label for="dlAll">All Records</label></div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button id="cancelDl" style="padding:8px 10px;border-radius:8px;border:1px solid #e5e7eb;background:transparent">Cancel</button>
+        <button id="confirmDl" style="padding:8px 10px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white">Download</button>
+      </div>
+    </div>
+  </div>
 
-  // ---------- CONFIG: your firebase config ----------
-  const firebaseConfig = {
-    apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
-    authDomain: "orc-meal-tracker.firebaseapp.com",
-    projectId: "orc-meal-tracker",
-    storageBucket: "orc-meal-tracker.firebasestorage.app",
-    messagingSenderId: "817313784849",
-    appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
-    measurementId: "G-H4X37NMPRH"
-  };
-  // ------------------------------------------------------------------------
+<script>
+/* ------------- FIREBASE (v8 non-module) ------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
+  authDomain: "orc-meal-tracker.firebaseapp.com",
+  projectId: "orc-meal-tracker",
+  storageBucket: "orc-meal-tracker.firebasestorage.app",
+  messagingSenderId: "817313784849",
+  appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
+  measurementId: "G-H4X37NMPRH"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+firebase.auth().signInAnonymously().catch(e => console.error('Auth error', e));
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-  await signInAnonymously(auth);
+/* ------------- SHARED UI & STATE ------------- */
+const excelFile = document.getElementById('excelFile');
+const fileStatus = document.getElementById('fileStatus');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const statusText = document.getElementById('statusText');
+const messageEl = document.getElementById('message');
+const readerElId = 'reader';
 
-  // DOM refs
-  const excelFile = document.getElementById('excelFile');
-  const fileStatus = document.getElementById('fileStatus');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
-  const statusEl = document.getElementById('status');
-  const messageEl = document.getElementById('message');
+const breakfastBtn = document.getElementById('breakfastBtn');
+const lunchBtn = document.getElementById('lunchBtn');
+const dinnerBtn = document.getElementById('dinnerBtn');
 
-  const breakfastBtn = document.getElementById('breakfastBtn');
-  const lunchBtn = document.getElementById('lunchBtn');
-  const dinnerBtn = document.getElementById('dinnerBtn');
+const downloadModal = document.getElementById('downloadModal');
+const cancelDl = document.getElementById('cancelDl');
+const confirmDl = document.getElementById('confirmDl');
 
-  // scanner
-  const readerId = 'reader';
-  const html5QrCode = new Html5Qrcode(readerId);
-  let scannerActive = false;
-  let validIDs = new Set();
-  let currentMeal = 'breakfast';
+let validIDs = new Set();
+let currentMeal = 'breakfast';
+let html5QrCode = null;
+let scannerActive = false;
 
-  // helpers
-  function todayKey(){ return new Date().toISOString().split('T')[0]; }
-  function nowTime(){ return new Date().toLocaleTimeString(); }
-  function setStatus(text){ statusEl.textContent = text; }
-  function showMessage(text, type='info'){
-    messageEl.textContent = text;
-    if(type === 'success') messageEl.style.color = '#e6fffa';
-    else if(type === 'error') messageEl.style.color = '#ffe4e6';
-    else messageEl.style.color = '#e0e7ff';
-    // clear after 2.5s
-    setTimeout(()=> { if(messageEl.textContent === text) messageEl.textContent = ''; }, 2500);
-  }
+/* helpers */
+function todayKey(){ return new Date().toISOString().split('T')[0]; }
+function nowTime(){ return new Date().toLocaleTimeString(); }
+function setStatus(t){ statusText.textContent = t; }
+function showMessage(text, type='info'){
+  messageEl.textContent = text;
+  if(type === 'success') messageEl.style.color = '#bbf7d0';
+  else if(type === 'error') messageEl.style.color = '#ffd6d6';
+  else messageEl.style.color = '#e0e7ff';
+  setTimeout(()=> { if(messageEl.textContent === text) messageEl.textContent = ''; }, 2800);
+}
 
-  // ID extraction (unchanged robust logic)
-  function extractId(scanned){
-    if(!scanned) return null;
-    const raw = String(scanned).trim();
-    const up = raw.toUpperCase();
-    if(validIDs.has(up)) return up;
-    const m = raw.match(/(?:ID|REGISTRATION_ID|REGID|REG|UID|STUDENT_ID)=([A-Za-z0-9\-_]+)/i);
-    if(m && m[1]){ const cand = m[1].toUpperCase(); if(validIDs.has(cand)) return cand; }
-    const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
-    for(const t of tokens) if(validIDs.has(t)) return t;
-    if(validIDs.size > 0 && validIDs.size <= 5000){ for(const id of validIDs) if(up.includes(id)) return id; }
-    return null;
-  }
-
-  // scan handler
-  async function onScanSuccess(decodedText){
-    try { await html5QrCode.stop(); } catch(e){/*ignore*/}
-    scannerActive = false;
-    setStatus('Processing...');
-    const id = extractId(decodedText);
-    if(!id){
-      showMessage('❌ Invalid QR', 'error');
-      setStatus('Invalid QR — ready');
-      setTimeout(startScanner, 1200);
-      return;
-    }
-
+/* ------------- EXCEL UPLOAD (xlsx) ------------- */
+excelFile.addEventListener('change', (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if(!f) return;
+  fileStatus.textContent = 'Loading Excel...';
+  const fr = new FileReader();
+  fr.onload = (e) => {
     try {
-      const docRef = doc(db, 'meal_records', id);
-      const snap = await getDoc(docRef);
-      const date = todayKey();
-      const mealDateKey = `${currentMeal}_date`;
-      const mealTimeKey = `${currentMeal}_time`;
+      let workbook;
+      try {
+        const data = new Uint8Array(e.target.result);
+        workbook = XLSX.read(data, { type: 'array' });
+      } catch(_){
+        workbook = XLSX.read(e.target.result, { type: 'binary' });
+      }
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if(!json || json.length === 0){ fileStatus.textContent = 'Excel empty or no rows.'; return; }
 
-      if(snap.exists()){
-        const data = snap.data();
-        const meals = data.meals || {};
-        if(meals[mealDateKey] === date){
-          showMessage('❌ Already Taken', 'error');
-        } else {
-          const updatedMeals = { ...meals, [mealDateKey]: date, [mealTimeKey]: nowTime() };
-          await updateDoc(docRef, { meals: updatedMeals, lastUpdate: new Date() });
-          showMessage('✅ Allowed', 'success');
-        }
+      // auto detect column
+      const headerCandidates = ['id','ID','Id','registration_id','registrationId','reg','reg_id','regid','student_id','studentid'];
+      const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
+      let idCol = null;
+      for(const k of firstRowKeys) if(headerCandidates.includes(k)) { idCol = k; break; }
+      if(!idCol) idCol = firstRowKeys[0];
+
+      validIDs = new Set();
+      for(const row of json){
+        const raw = row[idCol];
+        if(raw === undefined || raw === null) continue;
+        const s = String(raw).trim();
+        if(!s) continue;
+        validIDs.add(s.toUpperCase());
+      }
+
+      fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (column: ${idCol})`;
+      setStatus('Ready — click Start Scanning');
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    } catch(err){
+      console.error('Excel parse failed', err);
+      fileStatus.textContent = 'Failed to parse Excel.';
+    }
+  };
+  try { fr.readAsArrayBuffer(f); } catch(e) { fr.readAsBinaryString(f); }
+});
+
+/* ------------- QR ID extraction (robust) ------------- */
+function extractId(scanned){
+  if(!scanned) return null;
+  const raw = String(scanned).trim();
+  const up = raw.toUpperCase();
+  if(validIDs.has(up)) return up;
+  const m = raw.match(/(?:ID|REGISTRATION_ID|REGID|REG|UID|STUDENT_ID)=([A-Za-z0-9\-_]+)/i);
+  if(m && m[1]){ const cand = m[1].toUpperCase(); if(validIDs.has(cand)) return cand; }
+  const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
+  for(const t of tokens) if(validIDs.has(t)) return t;
+  if(validIDs.size > 0 && validIDs.size <= 5000){
+    for(const id of validIDs) if(up.includes(id)) return id;
+  }
+  return null;
+}
+
+/* ------------- SCANNER start/stop ------------- */
+async function startScanner(){
+  if(validIDs.size === 0){ setStatus('Upload Excel first'); return; }
+  setStatus('Starting camera — allow permission');
+  try {
+    if(!html5QrCode) html5QrCode = new Html5Qrcode(readerElId);
+    const cams = await Html5Qrcode.getCameras();
+    if(!cams || cams.length === 0) throw new Error('No cameras found');
+    let cam = cams[0];
+    for(const c of cams){ const lab = (c.label||'').toLowerCase(); if(lab.includes('back')||lab.includes('rear')||lab.includes('environment')) { cam = c; break } }
+    await html5QrCode.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
+    scannerActive = true;
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    setStatus('Camera live — scan QR');
+  } catch(err){
+    console.error('Start scanner error', err);
+    setStatus('Camera error: ' + (err && err.message ? err.message : String(err)));
+    showMessage('Camera permission/device error', 'error');
+  }
+}
+
+async function stopScanner(){
+  try { if(html5QrCode) await html5QrCode.stop(); } catch(e){ /* ignore */ }
+  scannerActive = false;
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  setStatus('Scanner stopped');
+}
+
+/* ------------- on successful scan ------------- */
+async function onScanSuccess(decodedText, decodedResult){
+  try { if(html5QrCode) await html5QrCode.stop(); } catch(e){/*ignore*/ }
+  scannerActive = false;
+  setStatus('Processing...');
+  const found = extractId(decodedText);
+  if(!found){
+    showMessage('❌ Invalid QR', 'error');
+    setStatus('Invalid QR — ready');
+    setTimeout(()=> startScanner(), 1200);
+    return;
+  }
+
+  try {
+    const docRef = db.collection('meal_records').doc(found);
+    const snap = await docRef.get();
+    const date = todayKey();
+    const mealDateKey = `${currentMeal}_date`;
+    const mealTimeKey = `${currentMeal}_time`;
+
+    if(snap.exists){
+      const data = snap.data();
+      const meals = data.meals || {};
+      if(meals[mealDateKey] === date){
+        showMessage('❌ Already Taken', 'error');
       } else {
-        const newMeals = { [mealDateKey]: date, [mealTimeKey]: nowTime() };
-        await setDoc(docRef, { id, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
+        const updatedMeals = Object.assign({}, meals, { [mealDateKey]: date, [mealTimeKey]: nowTime() });
+        await docRef.update({ meals: updatedMeals, lastUpdate: new Date() });
         showMessage('✅ Allowed', 'success');
       }
-      setStatus(`Processed ${id} — ready for next.`);
-    } catch(err){
-      console.error('Save error', err);
-      showMessage('❌ Save failed', 'error');
-      setStatus('Save error — check console.');
-    } finally {
-      setTimeout(startScanner, 1000);
+    } else {
+      const newMeals = { [mealDateKey]: date, [mealTimeKey]: nowTime() };
+      await docRef.set({ id: found, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
+      showMessage('✅ Allowed', 'success');
     }
+    setStatus(`Processed ${found} — ready.`);
+  } catch(err){
+    console.error('Save error', err);
+    showMessage('❌ Save failed', 'error');
+    setStatus('Save failed — check console');
+  } finally {
+    setTimeout(()=> startScanner(), 900);
   }
+}
 
-  // start/stop scanner
-  async function startScanner(){
-    if(validIDs.size === 0){ setStatus('Upload Excel first.'); return; }
-    setStatus('Starting camera — allow permission...');
-    try {
-      const cams = await Html5Qrcode.getCameras();
-      if(!cams || cams.length === 0) throw new Error('No camera found');
-      let cam = cams[0];
-      for(const c of cams){
-        const lab = (c.label || '').toLowerCase();
-        if(lab.includes('back') || lab.includes('rear') || lab.includes('environment')) { cam = c; break; }
+/* ------------- meal buttons behaviour ------------- */
+function setActiveMeal(btnEl, mealName){
+  [breakfastBtn, lunchBtn, dinnerBtn].forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+  currentMeal = mealName;
+  setStatus(`Mode: ${mealName.toUpperCase()}`);
+  // restart scanner lightly
+  try { if(html5QrCode) html5QrCode.stop(); } catch(e){}
+  setTimeout(()=> { if(!scannerActive) startScanner(); }, 300);
+}
+breakfastBtn.addEventListener('click', ()=> setActiveMeal(breakfastBtn, 'breakfast'));
+lunchBtn.addEventListener('click', ()=> setActiveMeal(lunchBtn, 'lunch'));
+dinnerBtn.addEventListener('click', ()=> setActiveMeal(dinnerBtn, 'dinner'));
+
+/* ------------- start/stop buttons ------------- */
+startBtn.addEventListener('click', startScanner);
+stopBtn.addEventListener('click', stopScanner);
+
+/* ------------- Download modal flow ------------- */
+downloadBtn.addEventListener('click', ()=> { downloadModal.style.display = 'flex'; });
+cancelDl.addEventListener('click', ()=> { downloadModal.style.display = 'none'; });
+
+confirmDl.addEventListener('click', async () => {
+  const choice = document.querySelector('input[name="dlOpt"]:checked').value;
+  confirmDl.disabled = true;
+  confirmDl.textContent = 'Preparing...';
+  try {
+    const snaps = await db.collection('meal_records').get();
+    const rows = [];
+    snaps.forEach(s => {
+      const d = s.data();
+      const meals = d.meals || {};
+      if(choice === 'today'){
+        const td = todayKey();
+        if(meals.breakfast_date === td) rows.push({ ID: d.id||s.id, Meal:'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time||'' });
+        if(meals.lunch_date === td) rows.push({ ID: d.id||s.id, Meal:'Lunch', Date: meals.lunch_date, Time: meals.lunch_time||'' });
+        if(meals.dinner_date === td) rows.push({ ID: d.id||s.id, Meal:'Dinner', Date: meals.dinner_date, Time: meals.dinner_time||'' });
+      } else {
+        if(meals.breakfast_date) rows.push({ ID: d.id||s.id, Meal:'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time||'' });
+        if(meals.lunch_date) rows.push({ ID: d.id||s.id, Meal:'Lunch', Date: meals.lunch_date, Time: meals.lunch_time||'' });
+        if(meals.dinner_date) rows.push({ ID: d.id||s.id, Meal:'Dinner', Date: meals.dinner_date, Time: meals.dinner_time||'' });
       }
-      await html5QrCode.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
-      scannerActive = true;
-      setStatus('Camera live — scan QR.');
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-    } catch(err){
-      console.error('Camera start failed', err);
-      setStatus('Camera error: ' + (err.message || err));
-      showMessage('Camera/device error', 'error');
+    });
+
+    if(rows.length === 0){
+      alert('No matching records found.');
+    } else {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'MealReport');
+      const fname = `meal_report_${choice}_${todayKey()}.xlsx`;
+      XLSX.writeFile(wb, fname);
     }
+  } catch(err){
+    console.error('Export failed', err);
+    alert('Export failed — check console.');
+  } finally {
+    confirmDl.disabled = false;
+    confirmDl.textContent = 'Download';
+    downloadModal.style.display = 'none';
   }
-  async function stopScanner(){ try{ await html5QrCode.stop(); } catch(e){} scannerActive=false; setStatus('Scanner stopped'); startBtn.disabled = false; stopBtn.disabled = true; }
+});
 
-  startBtn.addEventListener('click', startScanner);
-  stopBtn.addEventListener('click', stopScanner);
+/* initialize UI status */
+setStatus('Upload Excel (ID column) to begin.');
 
-  // excel load
-  excelFile.addEventListener('change', (ev) => {
-    const file = ev.target.files && ev.target.files[0];
-    if(!file) return;
-    fileStatus.textContent = 'Loading...';
-    const fr = new FileReader();
-    fr.onload = (e) => {
-      try {
-        let workbook;
-        try { const data = new Uint8Array(e.target.result); workbook = XLSX.read(data, { type: 'array' }); }
-        catch(_) { workbook = XLSX.read(e.target.result, { type: 'binary' }); }
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        if(!json || json.length === 0){ fileStatus.textContent = 'Excel empty or no rows.'; return; }
-        const headerCandidates = ['id','ID','Id','registration_id','registrationId','reg','reg_id','regid','student_id','studentid'];
-        const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
-        let idCol = null;
-        for(const k of firstRowKeys) if(headerCandidates.includes(k)) { idCol = k; break; }
-        if(!idCol) idCol = firstRowKeys[0];
-        validIDs = new Set();
-        for(const row of json){
-          const raw = row[idCol];
-          if(raw === undefined || raw === null) continue;
-          const s = String(raw).trim();
-          if(!s) continue;
-          validIDs.add(s.toUpperCase());
-        }
-        fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (col: ${idCol})`;
-        setStatus('Ready. Click Start Scanning.');
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-      } catch(err){ console.error('Excel parse failed', err); fileStatus.textContent = 'Failed to parse Excel.'; }
-    };
-    try{ fr.readAsArrayBuffer(file); } catch(e){ fr.readAsBinaryString(file); }
-  });
-
-  // meal buttons: UI highlight & set currentMeal
-  function setActive(buttonEl, mealName){
-    document.querySelectorAll('.meal-btn').forEach(b => b.classList.remove('active'));
-    buttonEl.classList.add('active');
-    currentMeal = mealName;
-    setStatus(`Mode: ${mealName.toUpperCase()}`);
-    // lightly restart scanner to avoid stale reads
-    try{ html5QrCode.stop(); } catch(e){}
-    setTimeout(()=> { if(!scannerActive) startScanner(); }, 250);
-  }
-  breakfastBtn.addEventListener('click', ()=> setActive(breakfastBtn, 'breakfast'));
-  lunchBtn.addEventListener('click', ()=> setActive(lunchBtn, 'lunch'));
-  dinnerBtn.addEventListener('click', ()=> setActive(dinnerBtn, 'dinner'));
-
-  // Download Report (structured rows: ID | Meal | Date | Time)
-  downloadBtn.addEventListener('click', async () => {
-    downloadBtn.disabled = true;
-    const origText = downloadBtn.textContent;
-    downloadBtn.textContent = 'Preparing...';
-    try {
-      const snaps = await getDocs(collection(db, 'meal_records'));
-      const rows = [];
-      snaps.forEach(s => {
-        const d = s.data();
-        const meals = d.meals || {};
-        if(meals.breakfast_date) rows.push({ ID: d.id || s.id, Meal: 'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time || '' });
-        if(meals.lunch_date) rows.push({ ID: d.id || s.id, Meal: 'Lunch', Date: meals.lunch_date, Time: meals.lunch_time || '' });
-        if(meals.dinner_date) rows.push({ ID: d.id || s.id, Meal: 'Dinner', Date: meals.dinner_date, Time: meals.dinner_time || '' });
-      });
-      if(rows.length === 0) { alert('No entries found in database.'); }
-      else {
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'MealReport');
-        XLSX.writeFile(wb, `meal_report_${todayKey()}.xlsx`);
-      }
-    } catch(err){ console.error('Export failed', err); alert('Export failed — check console.'); }
-    downloadBtn.disabled = false;
-    downloadBtn.textContent = origText;
-  });
-
-  // small utilities
-  function todayKey(){ return new Date().toISOString().split('T')[0]; }
-  function nowTime(){ return new Date().toLocaleTimeString(); }
-
-  // initial status
-  setStatus('Upload Excel (ID column) to begin.');
+/* ensure page won't try camera until Excel loaded */
+/* done */
 </script>
 </body>
 </html>
