@@ -1,102 +1,487 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guest Food Scanner</title>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORC Meal Tracking System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML5-QRCode Library for camera scanning -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-<style>
-body { font-family: Arial; text-align: center; padding: 15px; }
-button { padding: 12px 20px; margin: 8px; font-size: 18px; width: 170px; }
-#result { margin-top: 20px; font-size: 32px; font-weight: bold; }
-</style>
+        // Global variables for Firebase (provided by environment)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+
+        // Application State
+        let currentMode = 'breakfast'; // 'breakfast', 'lunch', or 'dinner'
+        let participantsData = [];
+        let qrCodeScanner = null; // Global instance for the camera scanner
+        
+        // Constants
+        const COLLECTION_NAME = 'meal_records';
+        const ROOT_PATH = `/artifacts/${appId}/public/data/${COLLECTION_NAME}`;
+
+        // The Apps Script URL is intentionally left blank as per user request (no Google Sheet logging needed)
+        const APPS_SCRIPT_URL = ''; 
+
+        // Utility functions
+        function getCurrentDateKey() {
+            // Returns YYYY-MM-DD format for daily tracking
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getCurrentTimestamp() {
+            return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function showFeedback(message, type = 'success') {
+            const feedbackEl = document.getElementById('feedback-message');
+            feedbackEl.textContent = message;
+            feedbackEl.className = 'p-3 rounded-xl font-semibold mt-4 text-center transition-opacity duration-300';
+
+            if (type === 'success') {
+                feedbackEl.classList.add('bg-green-100', 'text-green-700', 'shadow-lg');
+            } else if (type === 'error') {
+                feedbackEl.classList.add('bg-red-100', 'text-red-700', 'shadow-lg');
+            } else {
+                feedbackEl.classList.add('bg-blue-100', 'text-blue-700', 'shadow-lg');
+            }
+
+            // Clear after 5 seconds
+            setTimeout(() => {
+                feedbackEl.textContent = '';
+                feedbackEl.className = 'mt-4';
+            }, 5000);
+        }
+
+        // --- GOOGLE SHEET LOGGING (REMOVED LOGIC) ---
+
+        // Function to send data to the deployed Google Apps Script (now just a placeholder)
+        async function logToGoogleSheet(data) {
+            // Functionality removed as per user request.
+            return;
+        }
+
+
+        // --- CAMERA SCANNER LOGIC ---
+
+        function onScanSuccess(decodedText) {
+            // This is called when the scanner successfully reads a QR code
+            stopCameraScan();
+            processScannedId(decodedText);
+        }
+
+        function startCameraScan() {
+            if (!isAuthReady) {
+                showFeedback("System not ready. Please wait for initialization.", 'error');
+                return;
+            }
+
+            // Hide manual fallback and show camera view
+            document.getElementById('manual-scan-div').classList.add('hidden');
+            document.getElementById('camera-scan-div').classList.remove('hidden');
+
+            try {
+                if (!qrCodeScanner) {
+                    qrCodeScanner = new Html5Qrcode("reader");
+                }
+                
+                showFeedback("Starting camera scan... Please allow camera access.", 'info');
+
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                
+                // Start scanning, preferring the rear camera on mobile
+                qrCodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, (errorMessage) => {
+                    // Optional: show scanning errors (like low light, blurry image, etc.)
+                }).catch((err) => {
+                    console.error("Camera access error or failed start:", err);
+                    showFeedback("ERROR: Could not start camera. Falling back to manual input.", 'error');
+                    
+                    // FALLBACK: Show manual input and hide camera
+                    document.getElementById('manual-scan-div').classList.remove('hidden');
+                    document.getElementById('camera-scan-div').classList.add('hidden');
+                    document.getElementById('participant-id-input').focus();
+                });
+            } catch (e) {
+                console.error("QR Code Scanner initialization failed:", e);
+                showFeedback("QR Scanner failed to initialize. Falling back to manual input.", 'error');
+
+                // FALLBACK: Show manual input and hide camera
+                document.getElementById('manual-scan-div').classList.remove('hidden');
+                document.getElementById('camera-scan-div').classList.add('hidden');
+                document.getElementById('participant-id-input').focus();
+            }
+        }
+
+        async function stopCameraScan() {
+            if (qrCodeScanner && qrCodeScanner.isScanning) {
+                try {
+                    await qrCodeScanner.stop();
+                } catch (e) {
+                    // Handle case where stop() fails, often safely ignorable
+                    console.warn("Could not stop camera gracefully:", e);
+                }
+            }
+        }
+
+        // --- CORE FIREBASE LOGIC ---
+
+        // Extracted the core logic to be callable by both camera and manual input
+        async function processScannedId(participantId) {
+            if (!isAuthReady) {
+                showFeedback("System not ready. Please wait for initialization.", 'error');
+                return;
+            }
+
+            // Normalize ID for consistent database lookup
+            const normalizedId = participantId.trim().toUpperCase();
+
+            const dateKey = getCurrentDateKey();
+            const mealKey = `${currentMode}_date`;
+            const timestampKey = `${currentMode}_time`;
+            const docRef = doc(db, ROOT_PATH, normalizedId);
+            
+            let participantName = `Participant ${normalizedId}`;
+            let currentTimestamp = getCurrentTimestamp();
+
+            try {
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const meals = data.meals || {};
+                    
+                    // CRITICAL: Check for duplicate scan
+                    if (meals[mealKey] === dateKey) {
+                        showFeedback(`DUPLICATE! Participant ${normalizedId} already claimed ${currentMode} today at ${meals[timestampKey]}.`, 'error');
+                        // Restart camera scan after error
+                        startCameraScan();
+                        return;
+                    }
+                    
+                    participantName = data.name || participantName;
+
+                    // 1. Successful claim - update Firestore document
+                    const newMeals = {
+                        ...meals,
+                        [mealKey]: dateKey,
+                        [timestampKey]: currentTimestamp
+                    };
+
+                    await updateDoc(docRef, {
+                        meals: newMeals,
+                        lastUpdate: new Date()
+                    });
+
+                    showFeedback(`SUCCESS: ${normalizedId} has claimed ${currentMode}.`, 'success');
+
+                } else {
+                    // 1. New participant - create the document and log the meal
+                    const newMeals = {
+                        [mealKey]: dateKey,
+                        [timestampKey]: currentTimestamp
+                    };
+                    
+                    await setDoc(docRef, {
+                        name: participantName,
+                        meals: newMeals,
+                        registeredAt: new Date(),
+                        lastUpdate: new Date()
+                    });
+
+                    showFeedback(`NEW Participant ${normalizedId} registered and claimed ${currentMode}.`, 'success');
+                }
+
+                // 2. LOGGING STEP: (Now just a placeholder call)
+                logToGoogleSheet({
+                    participantId: normalizedId,
+                    name: participantName,
+                    mealType: currentMode.toUpperCase(),
+                    dateKey: dateKey,
+                    timestamp: currentTimestamp
+                });
+
+                // Restart camera scan after success
+                startCameraScan();
+                
+            } catch (e) {
+                console.error("Error processing scan:", e);
+                showFeedback(`An unexpected error occurred: ${e.message}`, 'error');
+            }
+        }
+
+        // Manual Input Handler (Physical Scanner / Text Entry - used as fallback)
+        async function handleScan(event) {
+            event.preventDefault();
+            const inputElement = document.getElementById('participant-id-input');
+            const participantId = inputElement.value.trim();
+            inputElement.value = ''; // Clear input immediately
+            
+            if (!participantId) {
+                showFeedback("Please enter a Participant ID.", 'error');
+                return;
+            }
+            
+            await processScannedId(participantId);
+        }
+
+        // Firebase Initialization and Listener
+        async function initFirebase() {
+            try {
+                setLogLevel('error');
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        document.getElementById('user-id-display').textContent = `User ID: ${userId}`;
+                        setupRealtimeListener();
+                    } else {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Initialization/Auth Error:", error);
+                showFeedback("Initialization failed. Check console for details.", 'error');
+            }
+        }
+
+        function setupRealtimeListener() {
+            if (!isAuthReady) return;
+
+            const q = query(collection(db, ROOT_PATH));
+            
+            onSnapshot(q, (snapshot) => {
+                participantsData = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    participantsData.push({
+                        id: doc.id,
+                        ...data,
+                    });
+                });
+                renderParticipantsTable();
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+                showFeedback("Error listening to data updates.", 'error');
+            });
+        }
+
+        // UI rendering
+        function changeMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-button').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'shadow-lg');
+                btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
+            });
+            document.getElementById(`${mode}-button`).classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
+            document.getElementById(`${mode}-button`).classList.add('bg-blue-600', 'text-white', 'shadow-lg');
+            document.getElementById('current-mode-display').textContent = mode.toUpperCase();
+            showFeedback(`Mode changed to ${mode}. Starting scan.`, 'info');
+            
+            // Re-start camera immediately after mode change
+            stopCameraScan();
+            startCameraScan();
+        }
+
+        function renderParticipantsTable() {
+            const dateKey = getCurrentDateKey();
+            const tableBody = document.getElementById('participants-table-body');
+            tableBody.innerHTML = '';
+            
+            const sortedData = participantsData.sort((a, b) => {
+                const aTime = a.lastUpdate ? (a.lastUpdate.toDate ? a.lastUpdate.toDate().getTime() : 0) : 0;
+                const bTime = b.lastUpdate ? (b.lastUpdate.toDate ? b.lastUpdate.toDate().getTime() : 0) : 0;
+                return bTime - aTime;
+            });
+
+            sortedData.forEach(p => {
+                const meals = p.meals || {};
+                
+                const bDate = meals.breakfast_date;
+                const lDate = meals.lunch_date;
+                const dDate = meals.dinner_date;
+
+                const hasBreakfast = bDate === dateKey;
+                const hasLunch = lDate === dateKey;
+                const hasDinner = dDate === dateKey;
+
+                const row = `
+                    <tr class="border-b transition duration-300 ${hasBreakfast || hasLunch || hasDinner ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'}">
+                        <td class="px-4 py-2 font-mono text-sm text-gray-800">${p.id}</td>
+                        <td class="px-4 py-2 font-medium text-gray-900">${p.name}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="${hasBreakfast ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'} text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                ${hasBreakfast ? meals.breakfast_time : 'NO'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="${hasLunch ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'} text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                ${hasLunch ? meals.lunch_time : 'NO'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="${hasDinner ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'} text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                ${hasDinner ? meals.dinner_time : 'NO'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // Initialize on window load
+        window.onload = function() {
+            initFirebase();
+            
+            // Initial mode setup which also starts the camera
+            changeMode('breakfast');
+            
+            // Attach event listeners
+            document.getElementById('breakfast-button').addEventListener('click', () => changeMode('breakfast'));
+            document.getElementById('lunch-button').addEventListener('click', () => changeMode('lunch'));
+            document.getElementById('dinner-button').addEventListener('click', () => changeMode('dinner'));
+            
+            // Keep the form submit handler for physical scanners/manual entry (as a hidden fallback)
+            document.getElementById('scan-form').addEventListener('submit', handleScan); 
+        };
+
+    </script>
+    <style>
+        /* Custom styles for aesthetic buttons and focus */
+        .mode-button {
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .mode-button:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); /* blue-500 with opacity */
+        }
+        #participant-id-input:focus {
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+        /* Style the camera container to look good */
+        #reader {
+            width: 100%;
+            border: 2px solid #3b82f6;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+    </style>
 </head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 font-[Inter]">
 
-<body>
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-blue-800">ORC Meal Tracker</h1>
+            <p class="text-lg text-gray-600 mt-1">Track attendance and prevent duplicates for today: <span class="font-bold text-gray-800" id="current-date-display">${getCurrentDateKey()}</span></p>
+            <p id="user-id-display" class="text-xs text-gray-500 mt-2"></p>
+        </header>
 
-<h2>Guest Food Scanner</h2>
+        <!-- Current Mode & Mode Selector -->
+        <div class="bg-white p-6 rounded-2xl shadow-xl mb-8">
+            <h2 class="text-2xl font-bold mb-4 text-gray-700">
+                Current Scan Mode: <span id="current-mode-display" class="text-blue-600">BREAKFAST</span>
+            </h2>
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="breakfast-button" class="mode-button w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-lg bg-blue-600 text-white shadow-lg">
+                    Breakfast
+                </button>
+                <button id="lunch-button" class="mode-button w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-lg bg-gray-200 text-gray-700 hover:bg-blue-100">
+                    Lunch
+                </button>
+                <button id="dinner-button" class="mode-button w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-lg bg-gray-200 text-gray-700 hover:bg-blue-100">
+                    Dinner
+                </button>
+            </div>
+        </div>
 
-<div>
-  <button onclick="setMeal('breakfast')">Breakfast</button>
-  <button onclick="setMeal('lunch')">Lunch</button>
-  <button onclick="setMeal('dinner')">Dinner</button>
-</div>
+        <!-- Scan Input & Feedback -->
+        <div class="bg-white p-6 rounded-2xl shadow-xl mb-8">
+            
+            <!-- Camera Scan View (Now the default view) -->
+            <div id="camera-scan-div" class="text-center"> 
+                <p class="text-lg font-semibold text-gray-700 mb-3">
+                    Point your device camera at the participant's QR code.
+                </p>
+                <!-- This is where the camera video feed will be displayed -->
+                <div id="reader"></div>
+            </div>
 
-<p>Selected Meal: <span id="mealDisplay">None</span></p>
+            <!-- Manual Scan View (Hidden Fallback for camera failure) -->
+            <div id="manual-scan-div" class="hidden">
+                <p class="text-sm text-gray-500 mb-3">
+                    *Camera unavailable. Use a physical scanner or enter ID manually.*
+                </p>
+                <form id="scan-form" class="flex flex-col md:flex-row gap-4">
+                    <input 
+                        type="text" 
+                        id="participant-id-input" 
+                        placeholder="Enter or Scan Participant ID..."
+                        class="flex-grow p-4 border border-gray-300 rounded-xl text-xl focus:ring-blue-500 focus:border-blue-500 transition"
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit" class="w-full md:w-auto px-6 py-4 bg-green-500 text-white font-bold text-xl rounded-xl hover:bg-green-600 transition shadow-md">
+                        CHECK IN
+                    </button>
+                </form>
+            </div>
 
-<div id="qr-reader" style="width: 330px; margin:auto;"></div>
-<p id="result"></p>
+            <div id="feedback-message" class="mt-4"></div>
+        </div>
 
-<script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgAZKOHIShAUqbZxQUEmoB0yH6HDuN3JvyqP460HvyVsJ3Lab_3newCpmImMJeFCY/exec";
+        <!-- Real-time Participant Table -->
+        <div class="bg-white p-6 rounded-2xl shadow-xl overflow-x-auto">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold text-gray-700">Today's Attendance Log (Real-time)</h2>
+            </div>
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">BREAKFAST</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">LUNCH</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">DINNER</th>
+                    </tr>
+                </thead>
+                <tbody id="participants-table-body" class="divide-y divide-gray-200">
+                    <!-- Data will be populated here by JavaScript -->
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-gray-500">Loading participant data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-let meal = "";
-let scanLock = false;
-let scanner;
-
-function setMeal(m) {
-  meal = m;
-  document.getElementById("mealDisplay").innerText = m.toUpperCase();
-}
-
-// Start Scanner
-function startScanner() {
-  scanner = new Html5Qrcode("qr-reader");
-  scanner.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    onScanSuccess
-  );
-}
-
-// Scan Handler
-function onScanSuccess(qrMessage) {
-  if (scanLock) return;
-  scanLock = true;
-
-  if (!meal) {
-    alert("Select meal before scanning.");
-    scanLock = false;
-    return;
-  }
-
-  // Stop camera to avoid multiple scans
-  scanner.stop();
-
-  fetch(`${SCRIPT_URL}?id=${qrMessage}&meal=${meal}`)
-    .then(res => res.text())
-    .then(t => {
-      let r = document.getElementById("result");
-
-      if (t == "ALLOW") { 
-        r.style.color = "green"; 
-        r.innerText = "✔ ALLOWED"; 
-      }
-      else if (t == "DENY") { 
-        r.style.color = "red"; 
-        r.innerText = "✖ ALREADY TAKEN"; 
-      }
-      else if (t == "INVALID") { 
-        r.style.color = "gray"; 
-        r.innerText = "⚠ INVALID GUEST"; 
-      }
-      else { 
-        r.style.color = "black"; 
-        r.innerText = t; 
-      }
-    })
-    .finally(() => {
-      // Restart scanner after short delay
-      setTimeout(() => {
-        scanLock = false;
-        startScanner();
-      }, 1200);
-    });
-}
-
-// Initialize
-startScanner();
-</script>
+    </div>
 
 </body>
 </html>
