@@ -73,7 +73,6 @@
 
         // --- GOOGLE SHEET LOGGING (REMOVED LOGIC) ---
 
-        // Function to send data to the deployed Google Apps Script (now just a placeholder)
         async function logToGoogleSheet(data) {
             // Functionality removed as per user request.
             return;
@@ -94,9 +93,14 @@
                 return;
             }
 
-            // Hide manual fallback and show camera view
+            const retryButton = document.getElementById('retry-camera-button');
+            const cameraStatusText = document.getElementById('camera-status-text');
+
+            // Hide fallback and retry button, show camera div
             document.getElementById('manual-scan-div').classList.add('hidden');
             document.getElementById('camera-scan-div').classList.remove('hidden');
+            retryButton.classList.add('hidden');
+            cameraStatusText.textContent = "Starting camera... Please allow permission if prompted.";
 
             try {
                 if (!qrCodeScanner) {
@@ -112,17 +116,18 @@
                     // Optional: show scanning errors (like low light, blurry image, etc.)
                 }).catch((err) => {
                     console.error("Camera access error or failed start:", err);
-                    showFeedback("ERROR: Could not start camera. Falling back to manual input.", 'error');
+                    showFeedback("ERROR: Could not start camera. Check browser permissions or retry.", 'error');
+                    cameraStatusText.textContent = "Camera failed to load. Use manual input or click 'Retry'.";
                     
-                    // FALLBACK: Show manual input and hide camera
+                    // FALLBACK: Show manual input and the retry button
                     document.getElementById('manual-scan-div').classList.remove('hidden');
-                    document.getElementById('camera-scan-div').classList.add('hidden');
+                    retryButton.classList.remove('hidden');
                     document.getElementById('participant-id-input').focus();
                 });
             } catch (e) {
                 console.error("QR Code Scanner initialization failed:", e);
                 showFeedback("QR Scanner failed to initialize. Falling back to manual input.", 'error');
-
+                
                 // FALLBACK: Show manual input and hide camera
                 document.getElementById('manual-scan-div').classList.remove('hidden');
                 document.getElementById('camera-scan-div').classList.add('hidden');
@@ -143,7 +148,6 @@
 
         // --- CORE FIREBASE LOGIC ---
 
-        // Extracted the core logic to be callable by both camera and manual input
         async function processScannedId(participantId) {
             if (!isAuthReady) {
                 showFeedback("System not ready. Please wait for initialization.", 'error');
@@ -367,6 +371,9 @@
             document.getElementById('lunch-button').addEventListener('click', () => changeMode('lunch'));
             document.getElementById('dinner-button').addEventListener('click', () => changeMode('dinner'));
             
+            // Manual camera retry button listener
+            document.getElementById('retry-camera-button').addEventListener('click', () => startCameraScan());
+            
             // Keep the form submit handler for physical scanners/manual entry (as a hidden fallback)
             document.getElementById('scan-form').addEventListener('submit', handleScan); 
         };
@@ -389,6 +396,8 @@
         /* Style the camera container to look good */
         #reader {
             width: 100%;
+            /* FIX: Added min-height to ensure the scanner viewport is always visible */
+            min-height: 300px; 
             border: 2px solid #3b82f6;
             border-radius: 1rem;
             overflow: hidden;
@@ -427,11 +436,16 @@
             
             <!-- Camera Scan View (Now the default view) -->
             <div id="camera-scan-div" class="text-center"> 
-                <p class="text-lg font-semibold text-gray-700 mb-3">
-                    Point your device camera at the participant's QR code.
+                <p class="text-lg font-semibold text-gray-700 mb-3" id="camera-status-text">
+                    Starting camera... Please allow permission if prompted.
                 </p>
                 <!-- This is where the camera video feed will be displayed -->
                 <div id="reader"></div>
+                
+                <!-- NEW: Retry Camera Button (Hidden unless startup fails) -->
+                <button id="retry-camera-button" class="mt-4 px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition shadow-md hidden">
+                    Retry Camera
+                </button>
             </div>
 
             <!-- Manual Scan View (Hidden Fallback for camera failure) -->
