@@ -87,6 +87,35 @@
             processScannedId(decodedText);
         }
 
+        async function stopCameraScan() {
+            if (qrCodeScanner && qrCodeScanner.isScanning) {
+                try {
+                    await qrCodeScanner.stop();
+                } catch (e) {
+                    // Handle case where stop() fails, often safely ignorable
+                    console.warn("Could not stop camera gracefully:", e);
+                }
+            }
+        }
+        
+        // Helper function to handle all camera failure scenarios
+        function handleCameraFailure(message) {
+            const retryButton = document.getElementById('retry-camera-button');
+            const cameraStatusText = document.getElementById('camera-status-text');
+
+            // Log detailed error to console for debugging
+            console.error("Camera Failure:", message); 
+            
+            showFeedback(`ERROR: ${message}`, 'error');
+            cameraStatusText.textContent = message + " Use manual input or click 'Retry'.";
+            
+            // Show manual input and the retry button
+            document.getElementById('manual-scan-div').classList.remove('hidden');
+            document.getElementById('camera-scan-div').classList.remove('hidden');
+            retryButton.classList.remove('hidden');
+            document.getElementById('participant-id-input').focus();
+        }
+
         function startCameraScan() {
             if (!isAuthReady) {
                 showFeedback("System not ready. Please wait for initialization.", 'error');
@@ -100,51 +129,63 @@
             document.getElementById('manual-scan-div').classList.add('hidden');
             document.getElementById('camera-scan-div').classList.remove('hidden');
             retryButton.classList.add('hidden');
-            cameraStatusText.textContent = "Starting camera... Please allow permission if prompted.";
+            
+            // Set initial status
+            cameraStatusText.textContent = "Attempting to find cameras and request permission...";
 
             try {
                 if (!qrCodeScanner) {
                     qrCodeScanner = new Html5Qrcode("reader");
                 }
                 
-                showFeedback("Starting camera scan... Please allow camera access.", 'info');
+                // CRITICAL: Force camera detection first. This is the step that usually triggers the browser permission prompt.
+                Html5Qrcode.getCameras().then(devices => {
+                    if (devices && devices.length) {
+                        // Attempt to find the rear camera (if available) or use the first one
+                        let cameraId = devices[0].id;
+                        const rearCamera = devices.find(device => 
+                            device.label.toLowerCase().includes('back') || 
+                            device.label.toLowerCase().includes('environment')
+                        );
+                        if (rearCamera) {
+                            cameraId = rearCamera.id;
+                        }
+                        
+                        cameraStatusText.textContent = "Camera found. Requesting access...";
+                        showFeedback("Camera access requested. Please grant permission in the pop-up.", 'info');
 
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                
-                // Start scanning, preferring the rear camera on mobile
-                qrCodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, (errorMessage) => {
-                    // Optional: show scanning errors (like low light, blurry image, etc.)
-                }).catch((err) => {
-                    console.error("Camera access error or failed start:", err);
-                    showFeedback("ERROR: Could not start camera. Check browser permissions or retry.", 'error');
-                    cameraStatusText.textContent = "Camera failed to load. Use manual input or click 'Retry'.";
-                    
-                    // FALLBACK: Show manual input and the retry button
-                    document.getElementById('manual-scan-div').classList.remove('hidden');
-                    retryButton.classList.remove('hidden');
-                    document.getElementById('participant-id-input').focus();
+                        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                        
+                        // Start scanning using the selected camera ID
+                        qrCodeScanner.start(
+                            cameraId, // Use specific ID or "environment"
+                            config, 
+                            onScanSuccess, 
+                            (errorMessage) => {
+                                // Scanning in-progress error messages (low light, etc.)
+                            }
+                        ).then(() => {
+                            cameraStatusText.textContent = "Camera is live. Scan your QR code.";
+                            showFeedback("Camera live and ready to scan.", 'success');
+                        }).catch((err) => {
+                            // Failure to start the stream after permission *was* granted (e.g., stream error)
+                            handleCameraFailure(`Camera stream failed to start: ${err.message}`);
+                        });
+
+                    } else {
+                         // No devices found (e.g., on a desktop without a camera)
+                        handleCameraFailure("No camera devices detected on this system.");
+                    }
+                }).catch(err => {
+                    // This catch block handles permission denial or initial camera access errors (where the prompt may not show).
+                    handleCameraFailure(`Permission Blocked. You might need to refresh the page and explicitly allow access, or use manual input.`);
                 });
             } catch (e) {
-                console.error("QR Code Scanner initialization failed:", e);
-                showFeedback("QR Scanner failed to initialize. Falling back to manual input.", 'error');
-                
-                // FALLBACK: Show manual input and hide camera
-                document.getElementById('manual-scan-div').classList.remove('hidden');
-                document.getElementById('camera-scan-div').classList.add('hidden');
-                document.getElementById('participant-id-input').focus();
+                console.error("QR Code Scanner initialization failed (Library error):", e);
+                handleCameraFailure("QR Scanner failed to initialize due to a library error.");
             }
         }
 
-        async function stopCameraScan() {
-            if (qrCodeScanner && qrCodeScanner.isScanning) {
-                try {
-                    await qrCodeScanner.stop();
-                } catch (e) {
-                    // Handle case where stop() fails, often safely ignorable
-                    console.warn("Could not stop camera gracefully:", e);
-                }
-            }
-        }
 
         // --- CORE FIREBASE LOGIC ---
 
