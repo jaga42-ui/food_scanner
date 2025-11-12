@@ -1,25 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ORC Meal Tracker (Excel IDs, robust QR parsing)</title>
+  <title>ORC Meal Tracker</title>
 
+  <!-- Tailwind for quick styling -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QR scanner -->
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- Excel reader -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
-    body { background:#f3f4f6; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto; }
-    .card { max-width:760px; margin:28px auto; background:white; padding:18px; border-radius:14px; box-shadow:0 10px 30px rgba(2,6,23,0.08); }
-    #reader { width:100%; height:360px; border-radius:12px; overflow:hidden; border:4px solid #2563eb; background:#071427; display:flex; align-items:center; justify-content:center; color:#cfe7ff; }
-    .mode-btn { padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; }
+    body { background:#f3f4f6; font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto; }
+    .card { max-width:760px; margin:28px auto; background:white; padding:18px; border-radius:12px; box-shadow:0 10px 30px rgba(2,6,23,0.06); }
+    #reader { width:100%; height:360px; border-radius:10px; overflow:hidden; border:4px solid #2563eb; background:#071427; display:flex; align-items:center; justify-content:center; color:#cfe7ff; }
+    .mode-btn { padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:700; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1 class="text-2xl font-extrabold text-blue-700">ORC Meal Tracker</h1>
-    <p class="text-sm text-gray-600 mt-1">Load Excel (ID column), scan QR — accepts only your IDs.</p>
+    <p class="text-sm text-gray-600 mt-1">Upload Excel (ID column) → scan QR → Allowed / Already Taken</p>
 
     <div class="mt-4 flex gap-2">
       <button id="breakfast-btn" class="mode-btn bg-blue-600 text-white">Breakfast</button>
@@ -28,33 +31,22 @@
     </div>
 
     <div class="mt-4">
-      <label class="block text-sm font-semibold">Upload Excel file (header like: ID, id, registration_id)</label>
+      <label class="block text-sm font-semibold">Upload Excel file (header: ID / id / registration_id / etc.)</label>
       <input id="excelFile" type="file" accept=".xlsx,.xls" class="mt-2 p-2 border rounded w-full" />
       <div id="fileStatus" class="text-xs text-gray-500 mt-1">No file loaded</div>
     </div>
 
     <div id="reader" class="mt-4">Camera preview will appear here</div>
-    <p id="status" class="mt-3 text-center text-gray-600">Upload Excel file to begin.</p>
-
+    <p id="status" class="mt-3 text-center text-gray-600">Please upload Excel first.</p>
     <div id="feedback" class="mt-4 text-center text-lg font-semibold"></div>
-
-    <div class="mt-4 flex gap-2 items-center">
-      <select id="report-type" class="p-2 border rounded">
-        <option value="today">Today's Records</option>
-        <option value="all">All Records</option>
-      </select>
-      <button id="download-btn" class="p-2 bg-green-600 text-white rounded">⬇️ Download Report</button>
-    </div>
   </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection
-  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-  /***** CONFIG: paste your firebase config here (already set to yours) *****/
+  // ---------- CONFIG: your firebase config ----------
   const firebaseConfig = {
     apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
     authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -64,110 +56,103 @@
     appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
     measurementId: "G-H4X37NMPRH"
   };
-  /************************************************************************/
+  // -------------------------------------------------
 
-  // initialize firebase
+  // Initialize Firebase + Firestore + Auth
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
   await signInAnonymously(auth);
 
   // UI refs
-  const readerElId = "reader";
-  const reader = new Html5Qrcode(readerElId);
-  const excelFileInput = document.getElementById("excelFile");
+  const readerId = "reader";
+  const reader = new Html5Qrcode(readerId);
+  const excelInput = document.getElementById("excelFile");
   const fileStatus = document.getElementById("fileStatus");
   const statusEl = document.getElementById("status");
   const feedbackEl = document.getElementById("feedback");
-  const reportTypeSel = document.getElementById("report-type");
 
-  // app state
-  let validIDs = new Set();       // normalized uppercase IDs loaded from Excel
-  let currentMeal = "breakfast";  // breakfast|lunch|dinner
+  // state
+  let validIDs = new Set();
+  let currentMeal = "breakfast";
 
-  // small helpers
+  // helpers
   function todayKey(){ return new Date().toISOString().split("T")[0]; }
   function nowTime(){ return new Date().toLocaleTimeString(); }
-  function showFeedback(msg, type="info"){
-    feedbackEl.textContent = msg;
+  function showMessage(text, type="info"){ // type: "success" or "error" or "info"
+    feedbackEl.textContent = text;
     feedbackEl.className = "mt-4 text-center text-lg font-semibold " + (type==="success" ? "text-green-600" : (type==="error" ? "text-red-600" : "text-blue-600"));
-    setTimeout(()=> feedbackEl.textContent = "", 3000);
+    // keep message short: remove after 3s
+    setTimeout(()=> { feedbackEl.textContent = ""; }, 3000);
   }
 
-  // --- robust extraction routine ---
-  // Try to find a valid ID inside decodedText.
-  // Strategy:
-  // 1) Normalize decodedText (trim, uppercase).
-  // 2) If exact match with a valid ID -> return.
-  // 3) If decodedText contains "id=..." or "ID=..." query param, extract token after "=" and check.
-  // 4) Otherwise, scan for any valid ID substring inside decodedText (this handles URLs, JSON, extra text).
-  function extractValidIdFromScanned(decodedText){
-    if(!decodedText) return null;
-    const raw = String(decodedText).trim();
+  // Robust extraction of ID from scanned string
+  function extractIdFromScanned(scanned){
+    if(!scanned) return null;
+    const raw = String(scanned).trim();
     const up = raw.toUpperCase();
 
-    // 1) exact match
+    // 1) direct exact
     if(validIDs.has(up)) return up;
 
-    // 2) look for common query-param patterns (id= OR registration_id=)
-    // use regex to capture token characters after = (alphanumeric + dash/underscore)
-    const paramRegex = /(?:ID|REGISTRATION_ID|REGID|REG|UID)=([A-Z0-9\-_]+)/i;
-    const m = raw.match(paramRegex);
-    if(m && m[1]){
-      const candidate = m[1].toUpperCase();
+    // 2) query param patterns like id=ORC001 or registration_id=ORC001
+    const paramMatch = raw.match(/(?:ID|REGISTRATION_ID|REGID|REG|UID|STUDENT_ID)=([A-Za-z0-9\-_]+)/i);
+    if(paramMatch && paramMatch[1]){
+      const candidate = String(paramMatch[1]).trim().toUpperCase();
       if(validIDs.has(candidate)) return candidate;
     }
 
-    // 3) split by non-alphanumeric and test tokens
+    // 3) token split by non-alnum and check tokens
     const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
-    for(const t of tokens){
-      if(validIDs.has(t)) return t;
-    }
+    for(const t of tokens){ if(validIDs.has(t)) return t; }
 
-    // 4) fallback: search for any valid id as substring (works if valid id format is unique)
-    // (only do this if validIDs size is reasonable)
-    if(validIDs.size > 0 && validIDs.size <= 5000) {
-      // iterate validIDs and test indexOf
-      for(const id of validIDs){
-        if(up.includes(id)) return id;
-      }
+    // 4) substring search — only if size not massive
+    if(validIDs.size > 0 && validIDs.size <= 5000){
+      for(const id of validIDs){ if(up.includes(id)) return id; }
     }
 
     return null;
   }
 
-  // --- Excel load handler ---
-  excelFileInput.addEventListener("change", (ev) => {
-    const f = ev.target.files && ev.target.files[0];
-    if(!f) return;
+  // Excel reading: try array buffer first; fallback to binary string
+  excelInput.addEventListener("change", (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    fileStatus.textContent = "Loading file...";
     const fr = new FileReader();
+
     fr.onload = (e) => {
-      try{
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, {type:"array"});
-        const sheet = wb.Sheets[wb.SheetNames[0]];
+      try {
+        let workbook;
+        try {
+          // prefer array buffer parsing
+          const data = new Uint8Array(e.target.result);
+          workbook = XLSX.read(data, { type: "array" });
+        } catch(errInner) {
+          // fallback to binary string parse
+          workbook = XLSX.read(e.target.result, { type: "binary" });
+        }
+
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-        // find best header column for IDs - common names:
-        const headerCandidates = ["id","ID","Id","registration_id","registrationId","reg","reg_id","regid","student_id","studentid"];
-        let idCol = null;
-        if(json.length === 0){
-          fileStatus.textContent = "Excel loaded but empty.";
+        if(!json || json.length === 0){
+          fileStatus.textContent = "Excel loaded but no rows found.";
+          statusEl.textContent = "Please provide Excel with ID column.";
           return;
         }
-        // check first row keys
-        const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
-        // pick the key that's most likely ID
-        for(const key of firstRowKeys){
-          if(headerCandidates.includes(key)) { idCol = key; break; }
-        }
-        // fallback: choose the first column
-        if(!idCol) idCol = firstRowKeys[0];
 
-        // build set of normalized IDs
+        // detect ID column name automatically
+        const headerCandidates = ["id","ID","Id","registration_id","registrationId","reg","reg_id","regid","student_id","studentid"];
+        const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
+        let idCol = null;
+        for(const key of firstRowKeys){ if(headerCandidates.includes(key)) { idCol = key; break; } }
+        if(!idCol) idCol = firstRowKeys[0]; // fallback to first column
+
+        // build set
         validIDs = new Set();
-        for(const row of json){
-          const rawVal = row[idCol];
+        for(const r of json){
+          const rawVal = r[idCol];
           if(rawVal === undefined || rawVal === null) continue;
           const s = String(rawVal).trim();
           if(s.length === 0) continue;
@@ -176,32 +161,37 @@
 
         fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (column: ${idCol})`;
         statusEl.textContent = "Excel loaded. Starting camera...";
+        // start scanner now
         startScanner();
       } catch(err){
         console.error("Excel parse error:", err);
-        fileStatus.textContent = "Failed to read Excel file.";
+        fileStatus.textContent = "Failed to read Excel file (see console).";
       }
     };
-    fr.readAsArrayBuffer(f);
+
+    // try arrayBuffer first (modern)
+    try {
+      fr.readAsArrayBuffer(file);
+    } catch(e) {
+      // fallback
+      fr.readAsBinaryString(file);
+    }
   });
 
-  // --- Scanner logic ---
+  // on successful QR decode
   async function onScanSuccess(decodedText, decodedResult){
-    try {
-      await reader.stop();
-    } catch(e){ /* ignore stop errors */ }
-
+    try { await reader.stop(); } catch(e) {}
     statusEl.textContent = "Processing...";
 
-    const foundId = extractValidIdFromScanned(decodedText);
+    const foundId = extractIdFromScanned(decodedText);
     if(!foundId){
-      showFeedback("❌ Invalid QR Code (not in the uploaded list)", "error");
-      statusEl.textContent = "Invalid QR. Ready.";
-      setTimeout(()=> startScanner(), 1500);
+      showMessage("❌ Invalid QR Code", "error");
+      statusEl.textContent = "Invalid QR — ready.";
+      setTimeout(()=> startScanner(), 1300);
       return;
     }
 
-    // proceed to check duplicate and save
+    // check duplicate and save
     try {
       const docRef = doc(db, "meal_records", foundId);
       const snap = await getDoc(docRef);
@@ -213,106 +203,70 @@
         const data = snap.data();
         const meals = data.meals || {};
         if(meals[mealDateKey] === dateKey){
-          showFeedback("❌ Already Taken (today)", "error");
+          showMessage("❌ Already Taken", "error");
         } else {
-          // update
           const updatedMeals = { ...meals, [mealDateKey]: dateKey, [mealTimeKey]: nowTime() };
           await updateDoc(docRef, { meals: updatedMeals, lastUpdate: new Date() });
-          showFeedback("✅ Allowed (updated)", "success");
+          showMessage("✅ Allowed", "success");
         }
       } else {
-        // new doc
         const newMeals = { [mealDateKey]: dateKey, [mealTimeKey]: nowTime() };
         await setDoc(docRef, { id: foundId, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
-        showFeedback("✅ Allowed (new)", "success");
+        showMessage("✅ Allowed", "success");
       }
-      statusEl.textContent = `Processed ${foundId} — Ready for next`;
+      statusEl.textContent = `Processed ${foundId} — ready for next.`;
     } catch(err){
-      console.error("Firestore error:", err);
-      showFeedback("❌ Save failed (check console)", "error");
-      statusEl.textContent = "Error while saving.";
+      console.error("Firestore save error:", err);
+      showMessage("❌ Save failed", "error");
+      statusEl.textContent = "Error saving record.";
     } finally {
       setTimeout(()=> startScanner(), 1200);
     }
   }
 
+  // start camera scanner (prefers rear camera)
   async function startScanner(){
-    if(validIDs.size === 0){
-      statusEl.textContent = "Please upload Excel file first (ID column).";
-      return;
-    }
+    if(validIDs.size === 0){ statusEl.textContent = "Please upload Excel file first."; return; }
+    statusEl.textContent = "Initializing camera...";
     try {
       const cams = await Html5Qrcode.getCameras();
-      if(!cams || cams.length === 0) throw new Error("No camera devices found");
-      // prefer rear camera by label (environment/back/rear)
+      if(!cams || cams.length === 0) throw new Error("No camera found");
       let cam = cams[0];
       for(const c of cams){
         const lab = (c.label || "").toLowerCase();
-        if(lab.includes("back") || lab.includes("rear") || lab.includes("environment")) { cam = c; break; }
+        if(lab.includes("back") || lab.includes("rear") || lab.includes("environment")){
+          cam = c;
+          break;
+        }
       }
       await reader.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
-      statusEl.textContent = "Camera live — scan QR code.";
+      statusEl.textContent = "Camera ready — scan QR code.";
     } catch(err){
       console.error("Scanner start error:", err);
       statusEl.textContent = "Camera error: " + (err && err.message ? err.message : String(err));
+      showMessage("Camera permission or device issue", "error");
     }
   }
 
-  // meal mode switching
+  // meal switching
   function switchMode(mode){
     currentMeal = mode;
-    document.getElementById("meal-mode").textContent = `Mode: ${mode.toUpperCase()}`;
-    document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("bg-blue-600","text-white"));
+    document.getElementById("status").textContent = `Mode: ${mode.toUpperCase()}.`;
+    document.querySelectorAll(".mode-btn").forEach(b=> { b.classList.remove("bg-blue-600","text-white"); b.classList.add("bg-gray-200","text-gray-800"); });
     document.getElementById(mode + "-btn")?.classList.add("bg-blue-600","text-white");
-    // restart scanner quickly
-    reader.stop().catch(()=>{});
+    try{ reader.stop(); } catch(e){}
     setTimeout(()=> startScanner(), 400);
   }
   document.getElementById("breakfast-btn").onclick = ()=> switchMode("breakfast");
   document.getElementById("lunch-btn").onclick = ()=> switchMode("lunch");
   document.getElementById("dinner-btn").onclick = ()=> switchMode("dinner");
 
-  // --- Download report with date filter ---
-  document.getElementById("download-btn").addEventListener("click", async ()=>{
-    const reportType = reportTypeSel.value;
-    try {
-      const snap = await getDocs(collection(db, "meal_records"));
-      const rows = [];
-      const today = todayKey();
-      snap.forEach(docsnap => {
-        const d = docsnap.data();
-        const meals = d.meals || {};
-        if(reportType === "today"){
-          const hasToday = meals.breakfast_date === today || meals.lunch_date === today || meals.dinner_date === today;
-          if(!hasToday) return;
-        }
-        rows.push({
-          ID: d.id || docsnap.id,
-          Breakfast_Date: meals.breakfast_date || "",
-          Breakfast_Time: meals.breakfast_time || "",
-          Lunch_Date: meals.lunch_date || "",
-          Lunch_Time: meals.lunch_time || "",
-          Dinner_Date: meals.dinner_date || "",
-          Dinner_Time: meals.dinner_time || ""
-        });
-      });
-      if(rows.length === 0){ alert("No matching records found."); return; }
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, reportType === "today" ? "Today" : "All");
-      XLSX.writeFile(wb, `meal_records_${reportType}_${today}.xlsx`);
-    } catch(err){
-      console.error("Export failed:", err);
-      alert("Export failed: " + (err.message || err));
-    }
-  });
-
-  // small utility placed near top code
+  // small utils used above
   function todayKey(){ return new Date().toISOString().split("T")[0]; }
   function nowTime(){ return new Date().toLocaleTimeString(); }
 
-  // done. wait for user to upload file
-  statusEl.textContent = "Waiting for Excel upload (ID column).";
+  // initial instructions
+  statusEl.textContent = "Upload Excel file (ID column) to begin.";
 </script>
 </body>
 </html>
