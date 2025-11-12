@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ORC Meal Tracker — Simple & Reliable</title>
+  <title>ORC Meal Tracker — Purple & Gray UI</title>
 
-  <!-- Tailwind (quick styling) -->
+  <!-- Tailwind for quick styling -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- HTML5 QR Code -->
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -13,43 +13,126 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
-    body { background:#f3f4f6; font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto; }
-    .card { max-width:760px; margin:28px auto; background:white; padding:18px; border-radius:12px; box-shadow:0 10px 30px rgba(2,6,23,0.06); }
-    #reader { width:100%; height:360px; border-radius:10px; overflow:hidden; border:4px solid #2563eb; background:#071427; display:flex; align-items:center; justify-content:center; color:#cfe7ff; }
+    :root{
+      --bg1: #1f1b2e;
+      --bg2: #3b2a57;
+      --muted: #9aa0a6;
+      --accent: #8b5cf6; /* purple */
+      --accent-2: #6d28d9;
+      --card: rgba(255,255,255,0.04);
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto}
+    body{
+      background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 60%, #1f2937 100%);
+      display:flex;align-items:center;justify-content:center;padding:20px;
+      color: #e6eef8;
+    }
+    .wrap{width:100%;max-width:980px}
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border-radius:16px;padding:18px;border:1px solid rgba(255,255,255,0.04);
+      box-shadow:0 10px 40px rgba(5,6,10,0.6);
+    }
+
+    header h1{font-size:20px;margin:0;color:var(--accent);letter-spacing:0.3px}
+    header p{margin:6px 0 0;color:var(--muted);font-size:13px}
+
+    /* Meal buttons */
+    .meals{display:flex;gap:10px;margin-top:14px}
+    .meal-btn{
+      flex:1;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:#e9ecff;font-weight:700;cursor:pointer;transition:all .18s;
+      box-shadow: 0 6px 20px rgba(11,7,23,0.25);
+    }
+    .meal-btn:hover{transform:translateY(-3px)}
+    .meal-btn.active{
+      background: linear-gradient(90deg,var(--accent),var(--accent-2));
+      color:white;box-shadow:0 10px 30px rgba(109,40,217,0.28);border-color:rgba(255,255,255,0.06);
+    }
+
+    /* Controls area */
+    .controls{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+    .btn {
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      padding:10px 14px;border-radius:12px;border:0;cursor:pointer;font-weight:700;
+      box-shadow:0 8px 20px rgba(6,6,12,0.45);transition:transform .12s, box-shadow .12s, opacity .12s;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+
+    .btn-purple{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white}
+    .btn-start{background:linear-gradient(90deg,#10b981,#059669);color:white}
+    .btn-stop{background:linear-gradient(90deg,#ef4444,#dc2626);color:white}
+    .btn-download{background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white}
+
+    /* File input */
+    .file-row{margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .file-input{
+      display:flex;flex:1;align-items:center;gap:10px;background:rgba(255,255,255,0.02);padding:8px;border-radius:12px;
+      border:1px dashed rgba(255,255,255,0.04);
+    }
+    .file-input input[type=file]{background:transparent;color:inherit}
+
+    /* Camera */
+    #reader{
+      width:100%;height:420px;border-radius:12px;overflow:hidden;margin-top:18px;border:4px solid rgba(255,255,255,0.04);
+      background: linear-gradient(180deg,#0b1220,#071427);display:flex;align-items:center;justify-content:center;color:#cfe7ff;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    /* Status card */
+    .status-card{margin-top:14px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));text-align:center}
+    .msg-large{font-size:20px;font-weight:800}
+
+    /* small screen adjustments */
+    @media (max-width:640px){
+      #reader{height:320px}
+      .meals{flex-direction:column}
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1 class="text-2xl font-extrabold text-blue-700">ORC Meal Tracker</h1>
-    <p class="text-sm text-gray-600 mt-1">Upload Excel → Scan QR → Allowed / Already Taken. When event ends, download DB.</p>
+  <div class="wrap">
+    <div class="panel">
+      <header>
+        <h1>ORC Meal Tracker</h1>
+        <p>Upload Excel → Scan QR → Allowed / Already Taken. Report export available.</p>
+      </header>
 
-    <div class="mt-4 flex gap-2">
-      <button id="breakfastBtn" class="px-3 py-2 rounded bg-blue-600 text-white">Breakfast</button>
-      <button id="lunchBtn" class="px-3 py-2 rounded bg-gray-200">Lunch</button>
-      <button id="dinnerBtn" class="px-3 py-2 rounded bg-gray-200">Dinner</button>
-    </div>
+      <!-- Meal selector -->
+      <div class="meals" role="tablist" aria-label="Meal selector">
+        <button id="breakfastBtn" class="meal-btn active" aria-pressed="true">Breakfast</button>
+        <button id="lunchBtn" class="meal-btn" aria-pressed="false">Lunch</button>
+        <button id="dinnerBtn" class="meal-btn" aria-pressed="false">Dinner</button>
+      </div>
 
-    <div class="mt-4">
-      <label class="block text-sm font-semibold">Upload Excel file (first sheet has ID column)</label>
-      <input id="excelFile" type="file" accept=".xlsx,.xls" class="mt-2 p-2 border rounded w-full" />
-      <div id="fileStatus" class="text-xs text-gray-500 mt-1">No file loaded</div>
-    </div>
+      <!-- File upload -->
+      <div class="file-row">
+        <div class="file-input">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          <span class="text-xs text-gray-300">Upload Excel (first sheet with ID column)</span>
+          <input id="excelFile" type="file" accept=".xlsx,.xls" />
+        </div>
 
-    <div id="reader" class="mt-4">Camera preview will appear here</div>
-    <p id="status" class="mt-3 text-center text-gray-600">Please upload Excel first.</p>
+        <div style="display:flex;gap:8px">
+          <button id="startBtn" class="btn btn-start" disabled>Start Scanning</button>
+          <button id="stopBtn" class="btn btn-stop" disabled>Stop</button>
+        </div>
 
-    <div class="mt-4 flex gap-2">
-      <button id="startBtn" class="px-4 py-2 bg-green-600 text-white rounded" disabled>Start Scanning</button>
-      <button id="stopBtn" class="px-4 py-2 bg-red-500 text-white rounded" disabled>Stop</button>
-      <button id="downloadBtn" class="px-4 py-2 bg-indigo-600 text-white rounded">Download DB</button>
-    </div>
+        <button id="downloadBtn" class="btn btn-download">Download Report</button>
+      </div>
 
-    <div class="mt-4">
-      <div id="message" class="text-center text-2xl font-bold h-12"></div>
-    </div>
+      <div id="fileStatus" class="text-xs text-gray-300 mt-2">No file loaded</div>
 
-    <div class="mt-4 text-xs text-gray-500">
-      Notes: open on mobile via HTTPS (GitHub Pages) or localhost server. Enable Firestore & Anonymous Auth in Firebase Console.
+      <!-- Camera preview -->
+      <div id="reader">Camera preview will appear here</div>
+
+      <!-- status and message -->
+      <div class="status-card">
+        <div id="status" class="text-sm text-gray-300">Upload Excel file to begin.</div>
+        <div id="message" class="msg-large mt-2"></div>
+      </div>
+
     </div>
   </div>
 
@@ -60,7 +143,7 @@
   } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-  // ---------- CONFIG: Replace with your Firebase config if needed ----------
+  // ---------- CONFIG: use your firebase config ----------
   const firebaseConfig = {
     apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
     authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -72,7 +155,7 @@
   };
   // ------------------------------------------------------------------------
 
-  // Initialize Firebase
+  // Initialize Firebase & Firestore & Auth
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
@@ -86,44 +169,45 @@
   const downloadBtn = document.getElementById('downloadBtn');
   const statusEl = document.getElementById('status');
   const messageEl = document.getElementById('message');
-  const readerContainerId = 'reader';
+
+  const breakfastBtn = document.getElementById('breakfastBtn');
+  const lunchBtn = document.getElementById('lunchBtn');
+  const dinnerBtn = document.getElementById('dinnerBtn');
 
   // scanner
-  const html5QrCode = new Html5Qrcode(readerContainerId);
+  const readerId = 'reader';
+  const html5QrCode = new Html5Qrcode(readerId);
   let scannerActive = false;
   let validIDs = new Set();
-  let currentMeal = 'breakfast'; // default
+  let currentMeal = 'breakfast';
 
   // helpers
   function todayKey(){ return new Date().toISOString().split('T')[0]; }
   function nowTime(){ return new Date().toLocaleTimeString(); }
-  function showLargeMessage(text, type='info'){
+  function setStatus(text){ statusEl.textContent = text; }
+  function showMessage(text, type='info'){
     messageEl.textContent = text;
-    messageEl.style.color = (type === 'success') ? '#059669' : (type === 'error' ? '#dc2626' : '#0ea5e9');
+    if(type === 'success') messageEl.style.color = '#bbf7d0';
+    else if(type === 'error') messageEl.style.color = '#fca5a5';
+    else messageEl.style.color = '#c7d2fe';
     // clear after 2.5s
     setTimeout(()=> { if(messageEl.textContent === text) messageEl.textContent = ''; }, 2500);
   }
 
-  // ID extraction / normalization
+  // ID extraction/normalization (unchanged logic)
   function extractId(scanned){
     if(!scanned) return null;
     const raw = String(scanned).trim();
     const up = raw.toUpperCase();
 
     if(validIDs.has(up)) return up;
-
-    // look for id= token
     const m = raw.match(/(?:ID|REGISTRATION_ID|REGID|REG|UID|STUDENT_ID)=([A-Za-z0-9\-_]+)/i);
     if(m && m[1]){
       const cand = m[1].toUpperCase();
       if(validIDs.has(cand)) return cand;
     }
-
-    // token split
     const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
     for(const t of tokens) if(validIDs.has(t)) return t;
-
-    // substring search only if set small
     if(validIDs.size > 0 && validIDs.size <= 5000){
       for(const id of validIDs) if(up.includes(id)) return id;
     }
@@ -131,20 +215,18 @@
   }
 
   // scan handler
-  async function onScanSuccess(decodedText, decodedResult){
-    try { await html5QrCode.stop(); } catch(e){}
+  async function onScanSuccess(decodedText){
+    try { await html5QrCode.stop(); } catch(e){ /* ignore */ }
     scannerActive = false;
-    statusEl.textContent = 'Processing...';
-
+    setStatus('Processing...');
     const id = extractId(decodedText);
     if(!id){
-      showLargeMessage('❌ Invalid QR', 'error');
-      statusEl.textContent = 'Invalid QR. Ready.';
+      showMessage('❌ Invalid QR', 'error');
+      setStatus('Invalid QR — ready.');
       setTimeout(startScanner, 1200);
       return;
     }
 
-    // check duplicate & save
     try {
       const docRef = doc(db, 'meal_records', id);
       const snap = await getDoc(docRef);
@@ -156,59 +238,58 @@
         const data = snap.data();
         const meals = data.meals || {};
         if(meals[mealDateKey] === date){
-          showLargeMessage('❌ Already Taken', 'error');
+          showMessage('❌ Already Taken', 'error');
         } else {
           const updatedMeals = { ...meals, [mealDateKey]: date, [mealTimeKey]: nowTime() };
           await updateDoc(docRef, { meals: updatedMeals, lastUpdate: new Date() });
-          showLargeMessage('✅ Allowed', 'success');
+          showMessage('✅ Allowed', 'success');
         }
       } else {
         const newMeals = { [mealDateKey]: date, [mealTimeKey]: nowTime() };
         await setDoc(docRef, { id, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
-        showLargeMessage('✅ Allowed', 'success');
+        showMessage('✅ Allowed', 'success');
       }
-      statusEl.textContent = `Processed ${id}. Ready for next.`;
+      setStatus(`Processed ${id} — ready for next.`);
     } catch(err){
       console.error('Save error', err);
-      showLargeMessage('❌ Save failed', 'error');
-      statusEl.textContent = 'Save error. Check console.';
+      showMessage('❌ Save failed', 'error');
+      setStatus('Save failed — check console.');
     } finally {
-      setTimeout(startScanner, 900);
+      setTimeout(startScanner, 1000);
     }
   }
 
-  // start / stop scanner
+  // start scanner
   async function startScanner(){
     if(validIDs.size === 0){
-      statusEl.textContent = 'Upload Excel first.';
+      setStatus('Upload Excel first.');
       return;
     }
-    statusEl.textContent = 'Starting camera... (allow permission)';
+    setStatus('Starting camera — allow permission...');
     try {
-      const cameras = await Html5Qrcode.getCameras();
-      if(!cameras || cameras.length === 0) throw new Error('No camera found');
-      // prefer rear
-      let cam = cameras[0];
-      for(const c of cameras){
+      const cams = await Html5Qrcode.getCameras();
+      if(!cams || cams.length === 0) throw new Error('No camera found');
+      let cam = cams[0];
+      for(const c of cams){
         const lab = (c.label || '').toLowerCase();
         if(lab.includes('back') || lab.includes('rear') || lab.includes('environment')) { cam = c; break; }
       }
       await html5QrCode.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
       scannerActive = true;
-      statusEl.textContent = 'Camera live — scan QR.';
+      setStatus('Camera live — scan QR.');
       startBtn.disabled = true;
       stopBtn.disabled = false;
     } catch(err){
       console.error('Camera start failed', err);
-      statusEl.textContent = 'Camera error: ' + (err.message || err);
-      showLargeMessage('Camera error — check permissions', 'error');
+      setStatus('Camera error: ' + (err.message || err));
+      showMessage('Camera permission/device error', 'error');
     }
   }
 
   async function stopScanner(){
-    try { await html5QrCode.stop(); } catch(e){}
+    try { await html5QrCode.stop(); } catch(e){ /* ignore */ }
     scannerActive = false;
-    statusEl.textContent = 'Scanner stopped.';
+    setStatus('Scanner stopped.');
     startBtn.disabled = false;
     stopBtn.disabled = true;
   }
@@ -216,11 +297,11 @@
   startBtn.addEventListener('click', startScanner);
   stopBtn.addEventListener('click', stopScanner);
 
-  // excel load (robust)
+  // excel load
   excelFile.addEventListener('change', (ev) => {
     const file = ev.target.files && ev.target.files[0];
     if(!file) return;
-    fileStatus.textContent = 'Loading...';
+    fileStatus.textContent = 'Loading file...';
     const fr = new FileReader();
     fr.onload = (e) => {
       try {
@@ -237,13 +318,11 @@
           fileStatus.textContent = 'Excel empty or no rows found.';
           return;
         }
-        // auto-detect ID column
         const headerCandidates = ['id','ID','Id','registration_id','registrationId','reg','reg_id','regid','student_id','studentid'];
         const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
         let idCol = null;
         for(const k of firstRowKeys) if(headerCandidates.includes(k)) { idCol = k; break; }
         if(!idCol) idCol = firstRowKeys[0];
-        // build set
         validIDs = new Set();
         for(const row of json){
           const raw = row[idCol];
@@ -253,7 +332,7 @@
           validIDs.add(s.toUpperCase());
         }
         fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (column: ${idCol})`;
-        statusEl.textContent = 'Ready. Click Start Scanning.';
+        setStatus('Ready. Click Start Scanning.');
         startBtn.disabled = false;
         stopBtn.disabled = true;
       } catch(err){
@@ -264,21 +343,22 @@
     try { fr.readAsArrayBuffer(file); } catch(e) { fr.readAsBinaryString(file); }
   });
 
-  // mode buttons
-  document.getElementById('breakfastBtn').addEventListener('click', () => {
-    currentMeal = 'breakfast';
-    document.getElementById('status').textContent = 'Mode: BREAKFAST';
-  });
-  document.getElementById('lunchBtn').addEventListener('click', () => {
-    currentMeal = 'lunch';
-    document.getElementById('status').textContent = 'Mode: LUNCH';
-  });
-  document.getElementById('dinnerBtn').addEventListener('click', () => {
-    currentMeal = 'dinner';
-    document.getElementById('status').textContent = 'Mode: DINNER';
-  });
+  // meal buttons UI behaviour (highlighting)
+  function setActiveMeal(btnEl, mealName){
+    document.querySelectorAll('.meal-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    currentMeal = mealName;
+    setStatus(`Mode: ${mealName.toUpperCase()}`);
+    // restart scanner lightly to clear any in-flight read
+    try{ html5QrCode.stop(); } catch(e){}
+    setTimeout(()=> { if(!scannerActive) startScanner(); }, 300);
+  }
 
-  // download DB button — fetch all docs and create xlsx
+  breakfastBtn.addEventListener('click', ()=> setActiveMeal(breakfastBtn, 'breakfast'));
+  lunchBtn.addEventListener('click', ()=> setActiveMeal(lunchBtn, 'lunch'));
+  dinnerBtn.addEventListener('click', ()=> setActiveMeal(dinnerBtn, 'dinner'));
+
+  // Download Report (structured rows: ID | Meal | Date | Time)
   downloadBtn.addEventListener('click', async () => {
     downloadBtn.disabled = true;
     downloadBtn.textContent = 'Preparing...';
@@ -288,35 +368,29 @@
       snaps.forEach(s => {
         const d = s.data();
         const meals = d.meals || {};
-        rows.push({
-          ID: d.id || s.id,
-          Breakfast_Date: meals.breakfast_date || '',
-          Breakfast_Time: meals.breakfast_time || '',
-          Lunch_Date: meals.lunch_date || '',
-          Lunch_Time: meals.lunch_time || '',
-          Dinner_Date: meals.dinner_date || '',
-          Dinner_Time: meals.dinner_time || ''
-        });
+        // for each meal key, emit a row if date exists
+        if(meals.breakfast_date) rows.push({ ID: d.id || s.id, Meal: 'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time || '' });
+        if(meals.lunch_date)     rows.push({ ID: d.id || s.id, Meal: 'Lunch', Date: meals.lunch_date, Time: meals.lunch_time || '' });
+        if(meals.dinner_date)    rows.push({ ID: d.id || s.id, Meal: 'Dinner', Date: meals.dinner_date, Time: meals.dinner_time || '' });
       });
-      if(rows.length === 0){ alert('No records in DB.'); }
+      if(rows.length === 0){ alert('No entries found in database.'); }
       else {
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'MealRecords');
-        const fname = `meal_records_all_${todayKey()}.xlsx`;
-        XLSX.writeFile(wb, fname);
+        XLSX.utils.book_append_sheet(wb, ws, 'MealReport');
+        XLSX.writeFile(wb, `meal_report_${todayKey()}.xlsx`);
       }
     } catch(err){
       console.error('Export failed', err);
       alert('Export failed — check console.');
     } finally {
       downloadBtn.disabled = false;
-      downloadBtn.textContent = 'Download DB';
+      downloadBtn.textContent = 'Download Report';
     }
   });
 
-  // ensure page instructs user
-  statusEl.textContent = 'Upload Excel file (ID column) to begin.';
+  // initial status
+  setStatus('Upload Excel (ID column) to begin.');
 </script>
 </body>
 </html>
