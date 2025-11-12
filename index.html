@@ -1,224 +1,318 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ORC Meal Tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ORC Meal Tracker (Excel IDs, robust QR parsing)</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body { background:#f3f4f6; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto; }
+    .card { max-width:760px; margin:28px auto; background:white; padding:18px; border-radius:14px; box-shadow:0 10px 30px rgba(2,6,23,0.08); }
+    #reader { width:100%; height:360px; border-radius:12px; overflow:hidden; border:4px solid #2563eb; background:#071427; display:flex; align-items:center; justify-content:center; color:#cfe7ff; }
+    .mode-btn { padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; }
+  </style>
 </head>
+<body>
+  <div class="card">
+    <h1 class="text-2xl font-extrabold text-blue-700">ORC Meal Tracker</h1>
+    <p class="text-sm text-gray-600 mt-1">Load Excel (ID column), scan QR — accepts only your IDs.</p>
 
-<body class="bg-gray-50 flex flex-col items-center min-h-screen font-[Inter]">
-  <div class="max-w-md w-full mt-8 p-6 bg-white shadow-2xl rounded-3xl border-t-8 border-blue-600">
-    <h1 class="text-3xl font-extrabold text-blue-700 text-center mb-3">ORC Meal Tracker</h1>
-    <p id="meal-mode" class="text-center text-gray-600 mb-4">Mode: BREAKFAST</p>
-
-    <div class="flex justify-center gap-2 mb-4">
-      <button id="breakfast-btn" class="mode-btn bg-blue-600 text-white px-4 py-2 rounded-lg">Breakfast</button>
-      <button id="lunch-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Lunch</button>
-      <button id="dinner-btn" class="mode-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Dinner</button>
+    <div class="mt-4 flex gap-2">
+      <button id="breakfast-btn" class="mode-btn bg-blue-600 text-white">Breakfast</button>
+      <button id="lunch-btn" class="mode-btn bg-gray-200 text-gray-800">Lunch</button>
+      <button id="dinner-btn" class="mode-btn bg-gray-200 text-gray-800">Dinner</button>
     </div>
 
-    <div class="mb-3">
-      <label class="block text-sm font-semibold text-gray-700 mb-1 text-center">Upload Excel file (with ID column)</label>
-      <input type="file" id="excelFile" accept=".xlsx, .xls" class="w-full border border-gray-300 p-2 rounded-md text-sm" />
-      <p id="fileStatus" class="text-xs text-center text-gray-500 mt-1">No file loaded</p>
+    <div class="mt-4">
+      <label class="block text-sm font-semibold">Upload Excel file (header like: ID, id, registration_id)</label>
+      <input id="excelFile" type="file" accept=".xlsx,.xls" class="mt-2 p-2 border rounded w-full" />
+      <div id="fileStatus" class="text-xs text-gray-500 mt-1">No file loaded</div>
     </div>
 
-    <div id="reader" class="w-full border-4 border-blue-500 rounded-2xl overflow-hidden" style="height:350px;"></div>
-    <p id="status" class="text-center text-gray-600 mt-2">Upload Excel to start.</p>
-    <div id="feedback" class="mt-4 text-center text-lg font-bold"></div>
+    <div id="reader" class="mt-4">Camera preview will appear here</div>
+    <p id="status" class="mt-3 text-center text-gray-600">Upload Excel file to begin.</p>
 
-    <div class="flex justify-center items-center gap-2 mt-6">
-      <select id="report-type" class="border border-gray-400 rounded-lg px-3 py-2 text-sm">
+    <div id="feedback" class="mt-4 text-center text-lg font-semibold"></div>
+
+    <div class="mt-4 flex gap-2 items-center">
+      <select id="report-type" class="p-2 border rounded">
         <option value="today">Today's Records</option>
         <option value="all">All Records</option>
       </select>
-      <button id="download-btn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-semibold">⬇️ Download Report</button>
+      <button id="download-btn" class="p-2 bg-green-600 text-white rounded">⬇️ Download Report</button>
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection
+  } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    // 🔥 Firebase Config
-    const firebaseConfig = {
-      apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
-      authDomain: "orc-meal-tracker.firebaseapp.com",
-      projectId: "orc-meal-tracker",
-      storageBucket: "orc-meal-tracker.firebasestorage.app",
-      messagingSenderId: "817313784849",
-      appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
-      measurementId: "G-H4X37NMPRH"
-    };
+  /***** CONFIG: paste your firebase config here (already set to yours) *****/
+  const firebaseConfig = {
+    apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
+    authDomain: "orc-meal-tracker.firebaseapp.com",
+    projectId: "orc-meal-tracker",
+    storageBucket: "orc-meal-tracker.firebasestorage.app",
+    messagingSenderId: "817313784849",
+    appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
+    measurementId: "G-H4X37NMPRH"
+  };
+  /************************************************************************/
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    await signInAnonymously(auth);
+  // initialize firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  await signInAnonymously(auth);
 
-    let validIDs = []; // IDs from Excel
-    let currentMeal = "breakfast";
-    const reader = new Html5Qrcode("reader");
-    const statusEl = document.getElementById("status");
-    const feedbackEl = document.getElementById("feedback");
+  // UI refs
+  const readerElId = "reader";
+  const reader = new Html5Qrcode(readerElId);
+  const excelFileInput = document.getElementById("excelFile");
+  const fileStatus = document.getElementById("fileStatus");
+  const statusEl = document.getElementById("status");
+  const feedbackEl = document.getElementById("feedback");
+  const reportTypeSel = document.getElementById("report-type");
 
-    function todayKey() {
-      return new Date().toISOString().split("T")[0];
-    }
-    function nowTime() {
-      return new Date().toLocaleTimeString();
-    }
-    function showMessage(msg, type) {
-      feedbackEl.textContent = msg;
-      feedbackEl.className = "mt-4 text-center text-lg font-bold";
-      feedbackEl.classList.add(type === "success" ? "text-green-600" : "text-red-600");
-      setTimeout(() => (feedbackEl.textContent = ""), 3000);
-    }
+  // app state
+  let validIDs = new Set();       // normalized uppercase IDs loaded from Excel
+  let currentMeal = "breakfast";  // breakfast|lunch|dinner
 
-    async function onScanSuccess(decodedText) {
-      await reader.stop();
-      const id = decodedText.trim().toUpperCase();
-      const date = todayKey();
+  // small helpers
+  function todayKey(){ return new Date().toISOString().split("T")[0]; }
+  function nowTime(){ return new Date().toLocaleTimeString(); }
+  function showFeedback(msg, type="info"){
+    feedbackEl.textContent = msg;
+    feedbackEl.className = "mt-4 text-center text-lg font-semibold " + (type==="success" ? "text-green-600" : (type==="error" ? "text-red-600" : "text-blue-600"));
+    setTimeout(()=> feedbackEl.textContent = "", 3000);
+  }
 
-      if (!validIDs.includes(id)) {
-        showMessage("❌ Invalid QR Code", "error");
-        statusEl.textContent = "Invalid QR. Try again.";
-        setTimeout(startScanner, 2000);
-        return;
-      }
+  // --- robust extraction routine ---
+  // Try to find a valid ID inside decodedText.
+  // Strategy:
+  // 1) Normalize decodedText (trim, uppercase).
+  // 2) If exact match with a valid ID -> return.
+  // 3) If decodedText contains "id=..." or "ID=..." query param, extract token after "=" and check.
+  // 4) Otherwise, scan for any valid ID substring inside decodedText (this handles URLs, JSON, extra text).
+  function extractValidIdFromScanned(decodedText){
+    if(!decodedText) return null;
+    const raw = String(decodedText).trim();
+    const up = raw.toUpperCase();
 
-      const docRef = doc(db, "meal_records", id);
-      const snap = await getDoc(docRef);
+    // 1) exact match
+    if(validIDs.has(up)) return up;
 
-      if (snap.exists()) {
-        const data = snap.data();
-        const meals = data.meals || {};
-        const mealDateKey = `${currentMeal}_date`;
-        const mealTimeKey = `${currentMeal}_time`;
-
-        if (meals[mealDateKey] === date) {
-          showMessage("❌ Already Taken", "error");
-        } else {
-          await updateDoc(docRef, {
-            meals: { ...meals, [mealDateKey]: date, [mealTimeKey]: nowTime() },
-            lastUpdate: new Date()
-          });
-          showMessage("✅ Allowed", "success");
-        }
-      } else {
-        await setDoc(docRef, {
-          id,
-          meals: { [`${currentMeal}_date`]: date, [`${currentMeal}_time`]: nowTime() },
-          registeredAt: new Date()
-        });
-        showMessage("✅ Allowed (New Entry)", "success");
-      }
-
-      statusEl.textContent = "Ready for next scan";
-      setTimeout(startScanner, 2000);
+    // 2) look for common query-param patterns (id= OR registration_id=)
+    // use regex to capture token characters after = (alphanumeric + dash/underscore)
+    const paramRegex = /(?:ID|REGISTRATION_ID|REGID|REG|UID)=([A-Z0-9\-_]+)/i;
+    const m = raw.match(paramRegex);
+    if(m && m[1]){
+      const candidate = m[1].toUpperCase();
+      if(validIDs.has(candidate)) return candidate;
     }
 
-    async function startScanner() {
-      if (validIDs.length === 0) {
-        statusEl.textContent = "Please upload Excel file first.";
-        return;
-      }
-      try {
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras.length) throw new Error("No camera found");
-        const backCam = cameras.find(c => c.label.toLowerCase().includes("back")) || cameras[0];
-        await reader.start(backCam.id, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess);
-        statusEl.textContent = "Camera ready. Scan your QR code.";
-      } catch (e) {
-        statusEl.textContent = "Camera failed: " + e.message;
+    // 3) split by non-alphanumeric and test tokens
+    const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
+    for(const t of tokens){
+      if(validIDs.has(t)) return t;
+    }
+
+    // 4) fallback: search for any valid id as substring (works if valid id format is unique)
+    // (only do this if validIDs size is reasonable)
+    if(validIDs.size > 0 && validIDs.size <= 5000) {
+      // iterate validIDs and test indexOf
+      for(const id of validIDs){
+        if(up.includes(id)) return id;
       }
     }
 
-    // 📂 Excel upload
-    document.getElementById("excelFile").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const readerExcel = new FileReader();
-      readerExcel.onload = function(evt) {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(firstSheet);
-        validIDs = json.map(row => String(row.ID).trim().toUpperCase());
-        document.getElementById("fileStatus").textContent = `✅ Loaded ${validIDs.length} IDs`;
-        statusEl.textContent = "Excel loaded. Starting camera...";
-        startScanner();
-      };
-      readerExcel.readAsArrayBuffer(file);
-    });
+    return null;
+  }
 
-    // 🥗 Meal Mode switcher
-    function switchMode(mode) {
-      currentMeal = mode;
-      document.getElementById("meal-mode").textContent = `Mode: ${mode.toUpperCase()}`;
-      document.querySelectorAll(".mode-btn").forEach(b => {
-        b.classList.remove("bg-blue-600", "text-white");
-        b.classList.add("bg-gray-200", "text-gray-700");
-      });
-      document.getElementById(`${mode}-btn`).classList.add("bg-blue-600", "text-white");
-      reader.stop().catch(() => {});
-      startScanner();
-    }
+  // --- Excel load handler ---
+  excelFileInput.addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    const fr = new FileReader();
+    fr.onload = (e) => {
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:"array"});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    document.getElementById("breakfast-btn").onclick = () => switchMode("breakfast");
-    document.getElementById("lunch-btn").onclick = () => switchMode("lunch");
-    document.getElementById("dinner-btn").onclick = () => switchMode("dinner");
-
-    // 📊 Download Firestore Data as Excel
-    document.getElementById("download-btn").addEventListener("click", async () => {
-      const reportType = document.getElementById("report-type").value;
-      try {
-        const querySnapshot = await getDocs(collection(db, "meal_records"));
-        const allData = [];
-        const today = todayKey();
-
-        querySnapshot.forEach((docSnap) => {
-          const d = docSnap.data();
-          const meals = d.meals || {};
-
-          if (reportType === "today") {
-            // include if any meal date matches today
-            const hasToday =
-              meals.breakfast_date === today ||
-              meals.lunch_date === today ||
-              meals.dinner_date === today;
-
-            if (!hasToday) return;
-          }
-
-          allData.push({
-            ID: d.id,
-            Breakfast_Date: meals.breakfast_date || "",
-            Breakfast_Time: meals.breakfast_time || "",
-            Lunch_Date: meals.lunch_date || "",
-            Lunch_Time: meals.lunch_time || "",
-            Dinner_Date: meals.dinner_date || "",
-            Dinner_Time: meals.dinner_time || ""
-          });
-        });
-
-        if (allData.length === 0) {
-          alert("No records found for selected filter.");
+        // find best header column for IDs - common names:
+        const headerCandidates = ["id","ID","Id","registration_id","registrationId","reg","reg_id","regid","student_id","studentid"];
+        let idCol = null;
+        if(json.length === 0){
+          fileStatus.textContent = "Excel loaded but empty.";
           return;
         }
+        // check first row keys
+        const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
+        // pick the key that's most likely ID
+        for(const key of firstRowKeys){
+          if(headerCandidates.includes(key)) { idCol = key; break; }
+        }
+        // fallback: choose the first column
+        if(!idCol) idCol = firstRowKeys[0];
 
-        const ws = XLSX.utils.json_to_sheet(allData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, reportType === "today" ? "Today" : "All Data");
-        XLSX.writeFile(wb, `meal_records_${reportType}_${today}.xlsx`);
-      } catch (err) {
-        alert("Error exporting data: " + err.message);
+        // build set of normalized IDs
+        validIDs = new Set();
+        for(const row of json){
+          const rawVal = row[idCol];
+          if(rawVal === undefined || rawVal === null) continue;
+          const s = String(rawVal).trim();
+          if(s.length === 0) continue;
+          validIDs.add(s.toUpperCase());
+        }
+
+        fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (column: ${idCol})`;
+        statusEl.textContent = "Excel loaded. Starting camera...";
+        startScanner();
+      } catch(err){
+        console.error("Excel parse error:", err);
+        fileStatus.textContent = "Failed to read Excel file.";
       }
-    });
-  </script>
+    };
+    fr.readAsArrayBuffer(f);
+  });
+
+  // --- Scanner logic ---
+  async function onScanSuccess(decodedText, decodedResult){
+    try {
+      await reader.stop();
+    } catch(e){ /* ignore stop errors */ }
+
+    statusEl.textContent = "Processing...";
+
+    const foundId = extractValidIdFromScanned(decodedText);
+    if(!foundId){
+      showFeedback("❌ Invalid QR Code (not in the uploaded list)", "error");
+      statusEl.textContent = "Invalid QR. Ready.";
+      setTimeout(()=> startScanner(), 1500);
+      return;
+    }
+
+    // proceed to check duplicate and save
+    try {
+      const docRef = doc(db, "meal_records", foundId);
+      const snap = await getDoc(docRef);
+      const dateKey = todayKey();
+      const mealDateKey = `${currentMeal}_date`;
+      const mealTimeKey = `${currentMeal}_time`;
+
+      if(snap.exists()){
+        const data = snap.data();
+        const meals = data.meals || {};
+        if(meals[mealDateKey] === dateKey){
+          showFeedback("❌ Already Taken (today)", "error");
+        } else {
+          // update
+          const updatedMeals = { ...meals, [mealDateKey]: dateKey, [mealTimeKey]: nowTime() };
+          await updateDoc(docRef, { meals: updatedMeals, lastUpdate: new Date() });
+          showFeedback("✅ Allowed (updated)", "success");
+        }
+      } else {
+        // new doc
+        const newMeals = { [mealDateKey]: dateKey, [mealTimeKey]: nowTime() };
+        await setDoc(docRef, { id: foundId, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
+        showFeedback("✅ Allowed (new)", "success");
+      }
+      statusEl.textContent = `Processed ${foundId} — Ready for next`;
+    } catch(err){
+      console.error("Firestore error:", err);
+      showFeedback("❌ Save failed (check console)", "error");
+      statusEl.textContent = "Error while saving.";
+    } finally {
+      setTimeout(()=> startScanner(), 1200);
+    }
+  }
+
+  async function startScanner(){
+    if(validIDs.size === 0){
+      statusEl.textContent = "Please upload Excel file first (ID column).";
+      return;
+    }
+    try {
+      const cams = await Html5Qrcode.getCameras();
+      if(!cams || cams.length === 0) throw new Error("No camera devices found");
+      // prefer rear camera by label (environment/back/rear)
+      let cam = cams[0];
+      for(const c of cams){
+        const lab = (c.label || "").toLowerCase();
+        if(lab.includes("back") || lab.includes("rear") || lab.includes("environment")) { cam = c; break; }
+      }
+      await reader.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
+      statusEl.textContent = "Camera live — scan QR code.";
+    } catch(err){
+      console.error("Scanner start error:", err);
+      statusEl.textContent = "Camera error: " + (err && err.message ? err.message : String(err));
+    }
+  }
+
+  // meal mode switching
+  function switchMode(mode){
+    currentMeal = mode;
+    document.getElementById("meal-mode").textContent = `Mode: ${mode.toUpperCase()}`;
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("bg-blue-600","text-white"));
+    document.getElementById(mode + "-btn")?.classList.add("bg-blue-600","text-white");
+    // restart scanner quickly
+    reader.stop().catch(()=>{});
+    setTimeout(()=> startScanner(), 400);
+  }
+  document.getElementById("breakfast-btn").onclick = ()=> switchMode("breakfast");
+  document.getElementById("lunch-btn").onclick = ()=> switchMode("lunch");
+  document.getElementById("dinner-btn").onclick = ()=> switchMode("dinner");
+
+  // --- Download report with date filter ---
+  document.getElementById("download-btn").addEventListener("click", async ()=>{
+    const reportType = reportTypeSel.value;
+    try {
+      const snap = await getDocs(collection(db, "meal_records"));
+      const rows = [];
+      const today = todayKey();
+      snap.forEach(docsnap => {
+        const d = docsnap.data();
+        const meals = d.meals || {};
+        if(reportType === "today"){
+          const hasToday = meals.breakfast_date === today || meals.lunch_date === today || meals.dinner_date === today;
+          if(!hasToday) return;
+        }
+        rows.push({
+          ID: d.id || docsnap.id,
+          Breakfast_Date: meals.breakfast_date || "",
+          Breakfast_Time: meals.breakfast_time || "",
+          Lunch_Date: meals.lunch_date || "",
+          Lunch_Time: meals.lunch_time || "",
+          Dinner_Date: meals.dinner_date || "",
+          Dinner_Time: meals.dinner_time || ""
+        });
+      });
+      if(rows.length === 0){ alert("No matching records found."); return; }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, reportType === "today" ? "Today" : "All");
+      XLSX.writeFile(wb, `meal_records_${reportType}_${today}.xlsx`);
+    } catch(err){
+      console.error("Export failed:", err);
+      alert("Export failed: " + (err.message || err));
+    }
+  });
+
+  // small utility placed near top code
+  function todayKey(){ return new Date().toISOString().split("T")[0]; }
+  function nowTime(){ return new Date().toLocaleTimeString(); }
+
+  // done. wait for user to upload file
+  statusEl.textContent = "Waiting for Excel upload (ID column).";
+</script>
 </body>
 </html>
