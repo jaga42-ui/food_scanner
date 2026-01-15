@@ -1,27 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ORC Smart Meal System</title>
 
-<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Firebase v8 -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<!-- QR + Excel -->
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-@keyframes fade {
-  from { opacity:0; transform:scale(.96) }
-  to { opacity:1; transform:scale(1) }
-}
+@keyframes fade { from {opacity:0; transform:scale(.96)} to {opacity:1; transform:scale(1)} }
 .fade { animation: fade .35s ease-out forwards }
 button { -webkit-tap-highlight-color: transparent; }
 </style>
@@ -33,25 +27,17 @@ button { -webkit-tap-highlight-color: transparent; }
 <div id="loginScreen" class="fixed inset-0 flex items-center justify-center">
   <div class="bg-white/10 backdrop-blur p-6 rounded-2xl w-80 fade shadow-xl">
     <h1 class="text-2xl font-bold text-center text-purple-400 mb-4">Login</h1>
-
     <input id="loginEmail" placeholder="Email"
       class="w-full mb-2 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
-
     <input id="loginPassword" type="password" placeholder="Password"
       class="w-full mb-4 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
-
     <button onclick="login()"
-      class="w-full py-2 rounded-xl font-semibold
-             bg-gradient-to-r from-purple-600 to-indigo-600
-             hover:scale-[1.02] transition shadow mb-2">
+      class="w-full py-2 rounded-xl font-semibold bg-purple-600 hover:bg-purple-700 transition mb-2">
       Login
     </button>
-
-    <button onclick="showSignup()"
-      class="w-full text-sm underline text-gray-300">
+    <button onclick="showSignup()" class="w-full text-sm underline text-gray-300">
       Create new account
     </button>
-
     <p id="loginError" class="text-red-400 text-sm mt-2"></p>
   </div>
 </div>
@@ -60,102 +46,123 @@ button { -webkit-tap-highlight-color: transparent; }
 <div id="signupScreen" class="hidden fixed inset-0 flex items-center justify-center">
   <div class="bg-white/10 backdrop-blur p-6 rounded-2xl w-80 fade shadow-xl">
     <h1 class="text-2xl font-bold text-center text-purple-400 mb-4">Sign Up</h1>
-
     <input id="signupEmail" placeholder="Email"
       class="w-full mb-2 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
-
     <input id="signupPassword" type="password" placeholder="Password"
       class="w-full mb-4 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
-
     <button onclick="signup()"
-      class="w-full py-2 rounded-xl font-semibold
-             bg-gradient-to-r from-green-600 to-emerald-600
-             hover:scale-[1.02] transition shadow mb-2">
+      class="w-full py-2 rounded-xl font-semibold bg-green-600 hover:bg-green-700 transition mb-2">
       Create Account
     </button>
-
-    <button onclick="showLogin()"
-      class="w-full text-sm underline text-gray-300">
+    <button onclick="showLogin()" class="w-full text-sm underline text-gray-300">
       Back to login
     </button>
-
     <p id="signupError" class="text-red-400 text-sm mt-2"></p>
   </div>
 </div>
 
 <!-- ================= APP ================= -->
 <div id="appScreen" class="hidden p-4 fade">
-  <div class="max-w-5xl mx-auto bg-white/5 backdrop-blur p-6 rounded-2xl space-y-6 shadow-2xl">
+<div class="max-w-5xl mx-auto bg-white/5 backdrop-blur p-6 rounded-2xl space-y-6 shadow-2xl">
 
-    <header class="text-center">
-      <h2 class="text-2xl font-bold text-purple-400">ORC Smart Meal System</h2>
-      <p id="roleText" class="text-sm text-gray-300"></p>
-    </header>
+<header class="text-center">
+  <h2 class="text-2xl font-bold text-purple-400">ORC Smart Meal System</h2>
+  <p id="roleText" class="text-sm text-gray-300"></p>
+</header>
 
-    <!-- ADMIN PANEL -->
-    <div id="adminPanel" class="hidden space-y-4">
-      <h3 class="font-bold text-lg">Admin Panel</h3>
+<p id="message" class="text-center text-xl font-bold"></p>
 
-      <select id="mealSelect" onchange="setMeal(this.value)"
-        class="w-full p-2 rounded-xl bg-[#1f1b2e] border border-white/20"></select>
+<!-- ================= ADMIN PANEL ================= -->
+<div id="adminPanel" class="hidden space-y-4">
 
-      <div class="bg-white/10 p-4 rounded-xl">
-        <h4 class="font-semibold mb-3">User Management</h4>
-        <ul id="userList" class="space-y-2 text-sm"></ul>
-      </div>
+<h3 class="font-bold text-lg">Admin Panel</h3>
 
-      <button onclick="openReport()"
-        class="w-full py-2 rounded-xl font-semibold
-               bg-gradient-to-r from-green-600 to-emerald-600 shadow">
-        Download Report
-      </button>
-    </div>
+<!-- Excel Upload Card -->
+<div class="bg-white/10 p-4 rounded-xl space-y-3">
+  <h4 class="font-semibold">Upload Excel (Allowed IDs)</h4>
 
-    <!-- SCANNER -->
-    <div id="scannerSection" class="hidden">
-      <div id="reader"
-        class="h-[340px] bg-black rounded-2xl
-               border-4 border-purple-500/30
-               shadow-2xl flex items-center justify-center">
-        Camera Ready
-      </div>
-    </div>
+  <label
+    class="flex flex-col items-center justify-center border-2 border-dashed
+           border-purple-400/40 rounded-xl p-4 cursor-pointer hover:bg-white/5 transition">
+    <span class="text-sm text-gray-300">Click to choose Excel file</span>
+    <input type="file" id="excelFile" accept=".xlsx,.xls" class="hidden">
+  </label>
 
-    <p id="message" class="text-center text-xl font-bold"></p>
-
-    <button onclick="logout()" class="block mx-auto text-xs underline">
-      Logout
-    </button>
+  <!-- Result Box -->
+  <div id="excelResult"
+    class="hidden bg-black/40 rounded-lg p-3 text-sm">
+    <p id="excelCount" class="text-green-400 font-semibold"></p>
   </div>
+</div>
+
+<select id="mealSelect" onchange="setMeal(this.value)"
+  class="w-full p-2 rounded-xl bg-[#1f1b2e] border border-white/20">
+</select>
+
+<div class="bg-white/10 p-4 rounded-xl">
+  <h4 class="font-semibold mb-3">User Management</h4>
+  <ul id="userList" class="space-y-2 text-sm"></ul>
+</div>
+
+<button onclick="openReport()"
+  class="w-full py-2 rounded-xl bg-green-600 font-semibold hover:bg-green-700 transition">
+  Download Report
+</button>
+
+</div>
+
+<!-- ================= VOLUNTEER PANEL ================= -->
+<div id="scannerSection" class="hidden space-y-4">
+
+<p class="text-sm text-center text-gray-300">
+Scan only works for IDs uploaded by admin
+</p>
+
+<div class="flex gap-3">
+<button id="startScanBtn" onclick="startScanner()"
+  class="flex-1 py-2 rounded-xl bg-green-600 font-semibold">
+  ▶ Start Scan
+</button>
+<button id="stopScanBtn" onclick="stopScanner()" disabled
+  class="flex-1 py-2 rounded-xl bg-red-600 font-semibold">
+  ■ Stop Scan
+</button>
+</div>
+
+<div class="bg-black rounded-2xl p-2 shadow-2xl">
+  <div id="reader"
+    class="h-[300px] rounded-xl border-4 border-purple-500/30
+           flex items-center justify-center text-gray-400">
+    Camera stopped
+  </div>
+</div>
+
+</div>
+
+<button onclick="logout()" class="block mx-auto text-xs underline">Logout</button>
+</div>
 </div>
 
 <!-- ================= REPORT MODAL ================= -->
 <div id="reportModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
-  <div class="bg-white text-black p-5 rounded-xl w-72">
-    <h3 class="font-bold mb-3">Download Report</h3>
-
-    <button onclick="downloadReport('today')"
-      class="w-full py-2 mb-2 rounded-lg font-semibold bg-purple-600 text-white">
-      Today Report
-    </button>
-
-    <button onclick="downloadReport('all')"
-      class="w-full py-2 mb-2 rounded-lg font-semibold bg-gray-800 text-white">
-      All Records
-    </button>
-
-    <button onclick="closeReport()" class="w-full text-sm underline">
-      Cancel
-    </button>
-  </div>
+<div class="bg-white text-black p-5 rounded-xl w-72">
+<h3 class="font-bold mb-3">Download Report</h3>
+<button onclick="downloadReport('today')" class="w-full py-2 mb-2 bg-purple-600 text-white rounded">
+Today Report
+</button>
+<button onclick="downloadReport('all')" class="w-full py-2 mb-2 bg-gray-800 text-white rounded">
+All Records
+</button>
+<button onclick="closeReport()" class="w-full text-sm underline">Cancel</button>
+</div>
 </div>
 
 <script>
-/* ---------- UI SWITCH ---------- */
+/* ================= UI SWITCH ================= */
 function showSignup(){ loginScreen.classList.add("hidden"); signupScreen.classList.remove("hidden"); }
 function showLogin(){ signupScreen.classList.add("hidden"); loginScreen.classList.remove("hidden"); }
 
-/* ---------- FIREBASE ---------- */
+/* ================= FIREBASE ================= */
 firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
   authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -164,125 +171,202 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ---------- CONFIG ---------- */
+/* ================= CONFIG ================= */
 const MEALS = [
   { key: "breakfast", label: "Breakfast" },
   { key: "lunch", label: "Lunch" },
   { key: "dinner", label: "Dinner" }
 ];
-let role = "", currentMeal = MEALS[0].key, scanner = null;
+let role="", currentMeal=MEALS[0].key, scanner=null;
+
 const today = () => new Date().toISOString().split("T")[0];
 const timeNow = () => new Date().toLocaleTimeString();
 
-/* ---------- AUTH ---------- */
+/* ================= EXCEL UPLOAD (ADMIN) ================= */
+excelFile.addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  excelResult.classList.add("hidden");
+
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const wb = XLSX.read(new Uint8Array(ev.target.result), { type:"array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+
+    if (!rows.length) return alert("Excel is empty");
+
+    const idColumn = Object.keys(rows[0])[0];
+
+    // Clear previous IDs
+    const batch = db.batch();
+    const old = await db.collection("allowed_ids").get();
+    old.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    let count = 0;
+    for (const r of rows) {
+      const id = String(r[idColumn]).trim().toUpperCase();
+      if (!id) continue;
+      await db.collection("allowed_ids").doc(id).set({
+        active:true,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      count++;
+    }
+
+    excelCount.textContent = `✔ ${count} IDs uploaded successfully`;
+    excelResult.classList.remove("hidden");
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+/* ================= AUTH ================= */
 function login(){
   auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value)
     .catch(e => loginError.textContent = e.message);
 }
 function signup(){
   auth.createUserWithEmailAndPassword(signupEmail.value, signupPassword.value)
-    .then(async cred => {
-      await db.collection("users").doc(cred.user.uid).set({
-        email: cred.user.email,
-        role: "pending",
-        createdAt: new Date()
+    .then(async c=>{
+      await db.collection("users").doc(c.user.uid).set({
+        email:c.user.email, role:"pending", createdAt:new Date()
       });
       alert("Account created. Waiting for admin approval.");
       showLogin();
     })
-    .catch(e => signupError.textContent = e.message);
+    .catch(e=>signupError.textContent=e.message);
 }
 function logout(){ stopScanner(); auth.signOut(); }
 
-/* ---------- ROLE LISTENER ---------- */
-auth.onAuthStateChanged(user => {
+/* ================= ROLE LISTENER ================= */
+auth.onAuthStateChanged(user=>{
   if(!user){
     loginScreen.style.display="flex";
-    signupScreen.classList.add("hidden");
     appScreen.classList.add("hidden");
     return;
   }
   loginScreen.style.display="none";
-  signupScreen.classList.add("hidden");
   appScreen.classList.remove("hidden");
 
-  db.collection("users").doc(user.uid).onSnapshot(async doc=>{
-    if(!doc.exists){ roleText.textContent="Waiting for admin approval"; return; }
+  db.collection("users").doc(user.uid).onSnapshot(doc=>{
+    if(!doc.exists) return;
     role = doc.data().role;
     roleText.textContent = "Role: " + role.toUpperCase();
 
-    if(role==="admin"){ await stopScanner(); adminPanel.style.display="block"; scannerSection.style.display="none"; loadMeals(); loadUsersRealtime(); }
-    if(role==="volunteer"){ adminPanel.style.display="none"; scannerSection.style.display="block"; startScanner(); }
-    if(role==="pending"||role==="disabled"){ await stopScanner(); adminPanel.style.display="none"; scannerSection.style.display="none"; }
+    adminPanel.style.display = role==="admin" ? "block" : "none";
+    scannerSection.style.display = role==="volunteer" ? "block" : "none";
+
+    stopScanner();
+    loadMeals();
+    if(role==="admin") loadUsers();
   });
 });
 
-/* ---------- MEALS ---------- */
-function loadMeals(){ mealSelect.innerHTML=""; MEALS.forEach(m=>{ let o=document.createElement("option"); o.value=m.key; o.textContent=m.label; mealSelect.appendChild(o); }); }
+/* ================= MEALS ================= */
+function loadMeals(){
+  mealSelect.innerHTML="";
+  MEALS.forEach(m=>{
+    const o=document.createElement("option");
+    o.value=m.key; o.textContent=m.label;
+    mealSelect.appendChild(o);
+  });
+}
 function setMeal(m){ currentMeal=m; }
 
-/* ---------- USERS ---------- */
-function loadUsersRealtime(){
-  db.collection("users").orderBy("createdAt").onSnapshot(snap=>{
+/* ================= USERS ================= */
+function loadUsers(){
+  db.collection("users").orderBy("createdAt").onSnapshot(s=>{
     userList.innerHTML="";
-    snap.forEach(doc=>{
-      let u=doc.data();
+    s.forEach(d=>{
+      const u=d.data();
       userList.innerHTML+=`
-<li class="flex flex-col sm:flex-row sm:justify-between gap-2 bg-white/10 p-3 rounded-xl">
-  <div><p>${u.email}</p><p class="text-xs text-gray-400">${u.role}</p></div>
-  <div class="flex flex-wrap gap-2">
-    <button onclick="updateRole('${doc.id}','volunteer')" class="px-3 py-1 text-xs bg-blue-600 rounded-lg">Volunteer</button>
-    <button onclick="updateRole('${doc.id}','admin')" class="px-3 py-1 text-xs bg-red-600 rounded-lg">Admin</button>
-    <button onclick="disableUser('${doc.id}')" class="px-3 py-1 text-xs bg-gray-700 rounded-lg">Remove</button>
+<li class="bg-white/10 p-3 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
+  <div>
+    <p>${u.email}</p>
+    <p class="text-xs text-gray-400">${u.role}</p>
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <button onclick="updateRole('${d.id}','volunteer')" class="px-3 py-1 bg-blue-600 text-xs rounded">Volunteer</button>
+    <button onclick="updateRole('${d.id}','admin')" class="px-3 py-1 bg-red-600 text-xs rounded">Admin</button>
+    <button onclick="disableUser('${d.id}')" class="px-3 py-1 bg-gray-700 text-xs rounded">Remove</button>
   </div>
 </li>`;
     });
   });
 }
-async function updateRole(uid,newRole){
-  if(uid===auth.currentUser.uid && newRole==="admin"){ alert("Self promotion blocked"); return; }
-  await db.collection("users").doc(uid).update({role:newRole});
+function updateRole(uid,r){
+  if(uid===auth.currentUser.uid && r==="admin") return alert("Self promotion blocked");
+  db.collection("users").doc(uid).update({role:r});
 }
-async function disableUser(uid){ if(confirm("Disable user?")) await db.collection("users").doc(uid).update({role:"disabled"}); }
+function disableUser(uid){
+  if(confirm("Disable user?"))
+    db.collection("users").doc(uid).update({role:"disabled"});
+}
 
-/* ---------- SCANNER ---------- */
+/* ================= SCANNER ================= */
 async function startScanner(){
-  await stopScanner();
+  if(scanner) return;
+  startScanBtn.disabled=true; stopScanBtn.disabled=false;
   scanner=new Html5Qrcode("reader");
+
   try{
-    await scanner.start({facingMode:"environment"},{fps:12,qrbox:{width:260,height:260}},onScanSuccess);
+    await scanner.start({facingMode:"environment"},
+      {fps:12,qrbox:{width:240,height:240}}, onScanSuccess);
   }catch{
-    let cams=await Html5Qrcode.getCameras();
-    if(cams.length) await scanner.start(cams[0].id,{fps:10,qrbox:250},onScanSuccess);
+    const cams=await Html5Qrcode.getCameras();
+    if(cams.length)
+      await scanner.start(cams[0].id,{fps:10,qrbox:230},onScanSuccess);
   }
 }
 async function stopScanner(){
-  if(scanner){ try{await scanner.stop();await scanner.clear();}catch{} scanner=null; reader.innerHTML="Camera Ready"; }
+  if(!scanner) return;
+  try{ await scanner.stop(); await scanner.clear(); }catch{}
+  scanner=null;
+  reader.textContent="Camera stopped";
+  startScanBtn.disabled=false; stopScanBtn.disabled=true;
 }
 async function onScanSuccess(text){
   const id=text.trim().toUpperCase();
+  const allowed=await db.collection("allowed_ids").doc(id).get();
+  if(!allowed.exists){
+    message.textContent="❌ Invalid ID";
+    return;
+  }
   const ref=db.collection("meal_records").doc(id);
   const snap=await ref.get();
   let meals=snap.exists?snap.data().meals||{}:{};
-  if(meals[currentMeal]?.date===today()){ message.textContent="❌ Already Taken"; }
-  else{ meals[currentMeal]={date:today(),time:timeNow()}; await ref.set({id,meals},{merge:true}); message.textContent="✅ Allowed"; }
+
+  if(meals[currentMeal]?.date===today()){
+    message.textContent="❌ Already Taken";
+  }else{
+    meals[currentMeal]={date:today(),time:timeNow()};
+    await ref.set({id,meals},{merge:true});
+    message.textContent="✅ Allowed";
+  }
 }
 
-/* ---------- REPORT ---------- */
+/* ================= REPORT ================= */
 function openReport(){ reportModal.classList.remove("hidden"); }
 function closeReport(){ reportModal.classList.add("hidden"); }
 async function downloadReport(type){
   closeReport();
   const snap=await db.collection("meal_records").get();
   const rows=[];
-  snap.forEach(d=>{ let meals=d.data().meals||{}; Object.keys(meals).forEach(k=>{ if(type==="today"&&meals[k].date!==today())return; rows.push({ID:d.id,Meal:k,Date:meals[k].date,Time:meals[k].time}); }); });
-  if(!rows.length)return alert("No records");
+  snap.forEach(d=>{
+    const m=d.data().meals||{};
+    Object.keys(m).forEach(k=>{
+      if(type==="today" && m[k].date!==today()) return;
+      rows.push({ID:d.id,Meal:k,Date:m[k].date,Time:m[k].time});
+    });
+  });
+  if(!rows.length) return alert("No records");
   const ws=XLSX.utils.json_to_sheet(rows);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Report");
   XLSX.writeFile(wb,`meal_report_${type}.xlsx`);
 }
 </script>
-
 </body>
 </html>
