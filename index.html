@@ -5,39 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORC Smart Meal System</title>
 
+<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Firebase v8 -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<!-- QR + Excel -->
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-.fade { animation: fade .4s ease-out forwards }
 @keyframes fade {
   from { opacity:0; transform:scale(.95) }
   to { opacity:1; transform:scale(1) }
 }
+.fade { animation: fade .35s ease-out forwards }
+button { -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 
 <body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white">
 
-<!-- LOGIN / SIGNUP -->
+<!-- ================= LOGIN / SIGNUP ================= -->
 <div id="loginScreen" class="fixed inset-0 flex items-center justify-center">
-  <div class="bg-white/10 p-6 rounded-xl w-80 fade">
+  <div class="bg-white/10 backdrop-blur p-6 rounded-2xl w-80 fade shadow-xl">
     <h1 class="text-2xl font-bold text-center text-purple-400 mb-4">
       ORC Meal System
     </h1>
 
-    <input id="email" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
-    <input id="password" type="password" class="w-full p-2 mb-4 rounded text-black" placeholder="Password">
+    <input id="email" placeholder="Email"
+      class="w-full mb-2 p-2 rounded-xl text-black
+             focus:outline-none focus:ring-2 focus:ring-purple-500">
 
-    <button onclick="login()" class="w-full bg-purple-600 py-2 rounded font-bold mb-2">
+    <input id="password" type="password" placeholder="Password"
+      class="w-full mb-4 p-2 rounded-xl text-black
+             focus:outline-none focus:ring-2 focus:ring-purple-500">
+
+    <button onclick="login()"
+      class="w-full py-2 rounded-xl font-semibold
+             bg-gradient-to-r from-purple-600 to-indigo-600
+             hover:scale-[1.02] active:scale-[0.98]
+             transition shadow-lg mb-2">
       Login
     </button>
 
-    <button onclick="signup()" class="w-full border border-white/40 py-2 rounded font-bold">
+    <button onclick="signup()"
+      class="w-full py-2 rounded-xl font-semibold
+             border border-white/30 hover:bg-white/10 transition">
       Sign Up
     </button>
 
@@ -45,66 +62,84 @@
   </div>
 </div>
 
-<!-- APP -->
+<!-- ================= APP ================= -->
 <div id="appScreen" class="hidden p-4 fade">
-  <div class="max-w-5xl mx-auto bg-white/5 p-6 rounded-xl space-y-6">
+  <div class="max-w-5xl mx-auto bg-white/5 backdrop-blur p-6 rounded-2xl space-y-6 shadow-2xl">
 
     <header class="text-center">
       <h2 class="text-2xl font-bold text-purple-400">ORC Smart Meal System</h2>
       <p id="roleText" class="text-sm text-gray-300"></p>
     </header>
 
-    <!-- ADMIN PANEL -->
+    <!-- ========== ADMIN PANEL ========== -->
     <div id="adminPanel" class="hidden space-y-4">
 
       <h3 class="font-bold text-lg">Admin Panel</h3>
 
-      <!-- MEAL SELECT -->
+      <!-- Meal Select -->
       <select id="mealSelect" onchange="setMeal(this.value)"
-        class="w-full bg-[#1f1b2e] p-2 rounded border border-white/20"></select>
+        class="w-full p-2 rounded-xl bg-[#1f1b2e] border border-white/20
+               focus:outline-none focus:ring-2 focus:ring-purple-500"></select>
 
-      <!-- USER MANAGEMENT -->
-      <div class="bg-black/30 p-4 rounded">
-        <h4 class="font-semibold mb-2">User Management</h4>
+      <!-- User Management -->
+      <div class="bg-white/10 p-4 rounded-xl">
+        <h4 class="font-semibold mb-3">User Management</h4>
         <ul id="userList" class="space-y-2 text-sm"></ul>
       </div>
 
-      <button onclick="openReport()" class="bg-green-600 py-2 rounded font-bold">
+      <button onclick="openReport()"
+        class="w-full py-2 rounded-xl font-semibold
+               bg-gradient-to-r from-green-600 to-emerald-600
+               hover:scale-[1.02] transition shadow">
         Download Report
       </button>
     </div>
 
-    <!-- SCANNER -->
+    <!-- ========== SCANNER (VOLUNTEER) ========== -->
     <div id="scannerSection" class="hidden">
-      <div id="reader" class="h-[320px] bg-black rounded flex items-center justify-center">
-        Camera Preview
+      <div id="reader"
+        class="h-[340px] bg-black rounded-2xl
+               border-4 border-purple-500/30
+               shadow-2xl flex items-center justify-center">
+        Camera Ready
       </div>
     </div>
 
-    <div class="text-center">
-      <p id="message" class="text-xl font-bold"></p>
-    </div>
+    <p id="message" class="text-center text-xl font-bold"></p>
 
-    <button onclick="logout()" class="text-xs underline block mx-auto">Logout</button>
+    <button onclick="logout()" class="block mx-auto text-xs underline">
+      Logout
+    </button>
   </div>
 </div>
 
-<!-- REPORT MODAL -->
-<div id="reportModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
+<!-- ================= REPORT MODAL ================= -->
+<div id="reportModal"
+  class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
   <div class="bg-white text-black p-5 rounded-xl w-72">
     <h3 class="font-bold mb-3">Download Report</h3>
-    <button onclick="downloadReport('today')" class="w-full bg-purple-600 text-white py-2 rounded mb-2">
+
+    <button onclick="downloadReport('today')"
+      class="w-full py-2 mb-2 rounded-lg font-semibold
+             bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
       Today Report
     </button>
-    <button onclick="downloadReport('all')" class="w-full bg-gray-800 text-white py-2 rounded mb-2">
+
+    <button onclick="downloadReport('all')"
+      class="w-full py-2 mb-2 rounded-lg font-semibold
+             bg-gray-800 text-white">
       All Records
     </button>
-    <button onclick="closeReport()" class="w-full text-sm underline">Cancel</button>
+
+    <button onclick="closeReport()"
+      class="w-full text-sm underline">
+      Cancel
+    </button>
   </div>
 </div>
 
 <script>
-/* FIREBASE */
+/* ================= FIREBASE ================= */
 firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
   authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -113,7 +148,7 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* CONFIG */
+/* ================= CONFIG ================= */
 const MEALS = [
   { key: "breakfast", label: "Breakfast" },
   { key: "lunch", label: "Lunch" },
@@ -124,11 +159,10 @@ let role = "";
 let currentMeal = MEALS[0].key;
 let scanner = null;
 
-/* HELPERS */
 const today = () => new Date().toISOString().split("T")[0];
 const timeNow = () => new Date().toLocaleTimeString();
 
-/* AUTH */
+/* ================= AUTH ================= */
 function login() {
   auth.signInWithEmailAndPassword(email.value, password.value)
     .catch(e => loginError.textContent = e.message);
@@ -152,7 +186,7 @@ function logout() {
   auth.signOut();
 }
 
-/* REAL-TIME ROLE LISTENER */
+/* ================= ROLE LISTENER ================= */
 auth.onAuthStateChanged(user => {
   if (!user) {
     loginScreen.style.display = "flex";
@@ -188,7 +222,7 @@ auth.onAuthStateChanged(user => {
       startScanner();
     }
 
-    if (role === "disabled" || role === "pending") {
+    if (role === "pending" || role === "disabled") {
       await stopScanner();
       adminPanel.style.display = "none";
       scannerSection.style.display = "none";
@@ -196,7 +230,7 @@ auth.onAuthStateChanged(user => {
   });
 });
 
-/* MEALS */
+/* ================= MEALS ================= */
 function loadMeals() {
   mealSelect.innerHTML = "";
   MEALS.forEach(m => {
@@ -208,29 +242,35 @@ function loadMeals() {
 }
 function setMeal(m) { currentMeal = m; }
 
-/* USER MANAGEMENT */
+/* ================= USER MANAGEMENT ================= */
 function loadUsersRealtime() {
   db.collection("users").orderBy("createdAt").onSnapshot(snap => {
     userList.innerHTML = "";
     snap.forEach(doc => {
       const u = doc.data();
       userList.innerHTML += `
-        <li class="flex justify-between bg-white/5 p-2 rounded">
+        <li class="flex justify-between items-center
+                   bg-white/10 p-3 rounded-xl shadow">
           <div>
             <p>${u.email}</p>
             <p class="text-xs text-gray-400">${u.role}</p>
           </div>
           <div class="flex gap-1">
-            <button onclick="updateRole('${doc.id}','volunteer')" class="px-2 bg-blue-600 rounded text-xs">Vol</button>
-            <button onclick="updateRole('${doc.id}','admin')" class="px-2 bg-red-600 rounded text-xs">Admin</button>
-            <button onclick="disableUser('${doc.id}')" class="px-2 bg-gray-700 rounded text-xs">Remove</button>
+            <button onclick="updateRole('${doc.id}','volunteer')"
+              class="px-2 py-1 rounded-lg text-xs font-semibold
+                     bg-blue-600 hover:scale-105 transition">Vol</button>
+            <button onclick="updateRole('${doc.id}','admin')"
+              class="px-2 py-1 rounded-lg text-xs font-semibold
+                     bg-red-600 hover:scale-105 transition">Admin</button>
+            <button onclick="disableUser('${doc.id}')"
+              class="px-2 py-1 rounded-lg text-xs font-semibold
+                     bg-gray-700 hover:scale-105 transition">Remove</button>
           </div>
         </li>`;
     });
   });
 }
 
-/* ROLE UPDATE */
 async function updateRole(targetUid, newRole) {
   if (role !== "admin") return;
   if (targetUid === auth.currentUser.uid && newRole === "admin") {
@@ -242,12 +282,12 @@ async function updateRole(targetUid, newRole) {
 }
 
 async function disableUser(uid) {
-  if (!confirm("Disable user?")) return;
+  if (!confirm("Disable this user?")) return;
   await db.collection("users").doc(uid).update({ role: "disabled" });
   logAudit("USER_DISABLED", uid, "disabled");
 }
 
-/* AUDIT */
+/* ================= AUDIT ================= */
 async function logAudit(action, targetUid, newRole) {
   await db.collection("audit_logs").add({
     action,
@@ -259,53 +299,63 @@ async function logAudit(action, targetUid, newRole) {
   });
 }
 
-/* SCANNER */
+/* ================= SCANNER (BACK CAMERA FIX) ================= */
 async function startScanner() {
   if (role !== "volunteer") return;
 
+  await stopScanner();
   scanner = new Html5Qrcode("reader");
 
-  const cameras = await Html5Qrcode.getCameras();
-  if (!cameras || cameras.length === 0) {
-    alert("No cameras found");
-    return;
+  try {
+    // Primary: force back camera
+    await scanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 12,
+        qrbox: { width: 260, height: 260 },
+        aspectRatio: 1
+      },
+      onScanSuccess,
+      () => {}
+    );
+  } catch (e) {
+    // Fallback
+    const cams = await Html5Qrcode.getCameras();
+    if (!cams.length) return alert("No camera found");
+
+    await scanner.start(
+      cams[0].id,
+      { fps: 10, qrbox: 250 },
+      onScanSuccess,
+      () => {}
+    );
   }
-
-  // 🔥 FORCE BACK CAMERA
-  let selectedCamera = cameras[0];
-
-  for (const cam of cameras) {
-    const label = cam.label.toLowerCase();
-    if (
-      label.includes("back") ||
-      label.includes("rear") ||
-      label.includes("environment")
-    ) {
-      selectedCamera = cam;
-      break;
-    }
-  }
-
-  await scanner.start(
-    selectedCamera.id,
-    {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      facingMode: "environment" // extra hint for mobile browsers
-    },
-    onScanSuccess
-  );
 }
 
 async function stopScanner() {
   if (scanner) {
     try { await scanner.stop(); await scanner.clear(); } catch {}
     scanner = null;
-    reader.innerHTML = "Camera Disabled";
+    reader.innerHTML = "Camera Ready";
   }
 }
 
-/* REPORT */
+async function onScanSuccess(text) {
+  const id = text.trim().toUpperCase();
+  const ref = db.collection("meal_records").doc(id);
+  const snap = await ref.get();
+  let meals = snap.exists ? snap.data().meals || {} : {};
+
+  if (meals[currentMeal]?.date === today()) {
+    message.textContent = "❌ Already Taken";
+  } else {
+    meals[currentMeal] = { date: today(), time: timeNow() };
+    await ref.set({ id, meals }, { merge: true });
+    message.textContent = "✅ Allowed";
+  }
+}
+
+/* ================= REPORT ================= */
 function openReport() { reportModal.classList.remove("hidden"); }
 function closeReport() { reportModal.classList.add("hidden"); }
 
@@ -313,14 +363,22 @@ async function downloadReport(type) {
   closeReport();
   const snap = await db.collection("meal_records").get();
   const rows = [];
+
   snap.forEach(d => {
     const meals = d.data().meals || {};
     Object.keys(meals).forEach(k => {
       if (type === "today" && meals[k].date !== today()) return;
-      rows.push({ ID: d.id, Meal: k, Date: meals[k].date, Time: meals[k].time });
+      rows.push({
+        ID: d.id,
+        Meal: k.toUpperCase(),
+        Date: meals[k].date,
+        Time: meals[k].time
+      });
     });
   });
+
   if (!rows.length) return alert("No records");
+
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Report");
@@ -330,4 +388,3 @@ async function downloadReport(type) {
 
 </body>
 </html>
-
