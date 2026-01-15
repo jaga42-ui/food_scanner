@@ -262,21 +262,39 @@ async function logAudit(action, targetUid, newRole) {
 /* SCANNER */
 async function startScanner() {
   if (role !== "volunteer") return;
+
   scanner = new Html5Qrcode("reader");
-  const cams = await Html5Qrcode.getCameras();
-  await scanner.start(cams[0].id, { fps: 10, qrbox: 250 }, async text => {
-    const id = text.trim().toUpperCase();
-    const ref = db.collection("meal_records").doc(id);
-    const snap = await ref.get();
-    let meals = snap.exists ? snap.data().meals || {} : {};
-    if (meals[currentMeal]?.date === today()) {
-      message.textContent = "❌ Already Taken";
-    } else {
-      meals[currentMeal] = { date: today(), time: timeNow() };
-      await ref.set({ id, meals }, { merge: true });
-      message.textContent = "✅ Allowed";
+
+  const cameras = await Html5Qrcode.getCameras();
+  if (!cameras || cameras.length === 0) {
+    alert("No cameras found");
+    return;
+  }
+
+  // 🔥 FORCE BACK CAMERA
+  let selectedCamera = cameras[0];
+
+  for (const cam of cameras) {
+    const label = cam.label.toLowerCase();
+    if (
+      label.includes("back") ||
+      label.includes("rear") ||
+      label.includes("environment")
+    ) {
+      selectedCamera = cam;
+      break;
     }
-  });
+  }
+
+  await scanner.start(
+    selectedCamera.id,
+    {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      facingMode: "environment" // extra hint for mobile browsers
+    },
+    onScanSuccess
+  );
 }
 
 async function stopScanner() {
@@ -312,3 +330,4 @@ async function downloadReport(type) {
 
 </body>
 </html>
+
