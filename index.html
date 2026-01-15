@@ -18,50 +18,81 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Animations -->
+  <style>
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-slide {
+      animation: fadeSlide 0.8s ease-out forwards;
+    }
+    .pulse-success {
+      animation: pulse 0.6s ease-in-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+  </style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white flex items-center justify-center p-4">
+<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white flex flex-col items-center justify-center p-4">
 
-  <div class="w-full max-w-4xl bg-white/5 backdrop-blur-xl rounded-2xl p-6 space-y-6 shadow-2xl">
+  <!-- MAIN CARD -->
+  <div class="w-full max-w-4xl bg-white/5 backdrop-blur-xl rounded-2xl p-6 space-y-6 shadow-2xl fade-slide">
 
     <header class="text-center">
       <h1 class="text-2xl font-bold text-purple-400">ORC Meal Tracker</h1>
-      <p class="text-gray-300 text-sm">Upload Excel → Scan QR → Track Meals</p>
+      <p class="text-gray-300 text-sm">
+        Upload Excel → Scan QR → Track Meals → Download Report
+      </p>
     </header>
 
-    <!-- Meal Buttons -->
+    <!-- MEAL BUTTONS -->
     <div class="flex gap-3">
-      <button onclick="setMeal('breakfast')" id="breakfastBtn" class="meal-btn active">Breakfast</button>
-      <button onclick="setMeal('lunch')" id="lunchBtn" class="meal-btn">Lunch</button>
-      <button onclick="setMeal('dinner')" id="dinnerBtn" class="meal-btn">Dinner</button>
+      <button id="breakfastBtn" onclick="setMeal('breakfast')" class="meal-btn active">Breakfast</button>
+      <button id="lunchBtn" onclick="setMeal('lunch')" class="meal-btn">Lunch</button>
+      <button id="dinnerBtn" onclick="setMeal('dinner')" class="meal-btn">Dinner</button>
     </div>
 
-    <!-- Upload -->
-    <input type="file" id="excelFile" accept=".xlsx,.xls" class="block w-full text-sm text-gray-300" />
+    <!-- EXCEL UPLOAD -->
+    <input type="file" id="excelFile" accept=".xlsx,.xls"
+      class="block w-full text-sm text-gray-300" />
 
-    <!-- Camera -->
-    <div id="reader" class="w-full h-[320px] bg-black/40 rounded-xl border-4 border-white/10 flex items-center justify-center"></div>
+    <!-- CAMERA -->
+    <div id="reader"
+      class="w-full h-[320px] bg-black/40 rounded-xl border-4 border-white/10 flex items-center justify-center">
+    </div>
 
-    <!-- Actions -->
-    <button onclick="startScan()" class="w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 rounded-xl font-bold hover:scale-[1.02] transition">
-      Start Scanning
-    </button>
+    <!-- ACTION BUTTONS -->
+    <div class="flex flex-col sm:flex-row gap-3">
+      <button onclick="startScan()"
+        class="flex-1 py-3 bg-gradient-to-r from-purple-500 to-purple-700 rounded-xl font-bold hover:scale-[1.03] transition">
+        Start Scanning
+      </button>
 
-    <!-- Status -->
+      <button onclick="downloadReport()"
+        class="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-700 rounded-xl font-bold hover:scale-[1.03] transition">
+        Download Report
+      </button>
+    </div>
+
+    <!-- STATUS -->
     <div class="text-center space-y-1">
       <p id="status" class="text-gray-400 text-sm">Upload Excel to begin</p>
       <p id="message" class="text-xl font-extrabold"></p>
     </div>
-
   </div>
 
-<script>
-/* ---------- STYLES ---------- */
-document.querySelectorAll('.meal-btn').forEach(b => {
-  b.className = "meal-btn flex-1 py-2 rounded-xl font-semibold bg-white/10 hover:bg-white/20 transition";
-});
-document.getElementById('breakfastBtn').classList.add("bg-purple-600");
+  <!-- FOOTER -->
+  <footer class="mt-6 text-xs text-gray-400 text-center">
+    © <span id="year"></span> ORC Meal Tracker · Developed by Guru Prasad Jena
+  </footer>
 
+<script>
 /* ---------- FIREBASE ---------- */
 firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
@@ -85,19 +116,29 @@ let processing = false;
 const statusEl = document.getElementById("status");
 const msgEl = document.getElementById("message");
 
+document.getElementById("year").textContent = new Date().getFullYear();
+
 const today = () => new Date().toISOString().split("T")[0];
 const timeNow = () => new Date().toLocaleTimeString();
 const normalize = v => String(v || "").replace(/\s+/g,"").toUpperCase();
 
-/* ---------- MEAL ---------- */
+/* ---------- MEAL BUTTON STYLE ---------- */
+document.querySelectorAll(".meal-btn").forEach(btn => {
+  btn.className =
+    "meal-btn flex-1 py-2 rounded-xl font-semibold bg-white/10 hover:bg-white/20 transition";
+});
+document.getElementById("breakfastBtn").classList.add("bg-purple-600");
+
+/* ---------- MEAL CHANGE ---------- */
 function setMeal(meal){
   currentMeal = meal;
-  document.querySelectorAll('.meal-btn').forEach(b => b.classList.remove("bg-purple-600"));
-  document.getElementById(meal+"Btn").classList.add("bg-purple-600");
+  document.querySelectorAll(".meal-btn")
+    .forEach(b => b.classList.remove("bg-purple-600"));
+  document.getElementById(meal + "Btn").classList.add("bg-purple-600");
   statusEl.textContent = `Mode: ${meal.toUpperCase()}`;
 }
 
-/* ---------- EXCEL ---------- */
+/* ---------- EXCEL UPLOAD ---------- */
 excelFile.onchange = e => {
   const file = e.target.files[0];
   const reader = new FileReader();
@@ -134,7 +175,7 @@ async function startScan(){
 
     const id = extractId(text);
     if(!id){
-      msg("❌ Invalid QR","red");
+      showMsg("❌ Invalid QR","red");
       processing=false;
       return startScan();
     }
@@ -145,8 +186,8 @@ async function startScan(){
     const tKey = currentMeal+"_time";
 
     if(snap.exists && snap.data().meals?.[dKey] === today()){
-      msg("❌ Already Taken","red");
-    }else{
+      showMsg("❌ Already Taken","red");
+    } else {
       await ref.set({
         id,
         meals:{
@@ -156,7 +197,8 @@ async function startScan(){
         },
         lastUpdate:new Date()
       },{merge:true});
-      msg("✅ Allowed","green");
+      showMsg("✅ Allowed","green");
+      msgEl.classList.add("pulse-success");
       navigator.vibrate?.(100);
     }
 
@@ -165,8 +207,29 @@ async function startScan(){
   });
 }
 
-/* ---------- UI ---------- */
-function msg(text,color){
+/* ---------- REPORT DOWNLOAD ---------- */
+async function downloadReport(){
+  const snap = await db.collection("meal_records").get();
+  const rows = [];
+
+  snap.forEach(doc=>{
+    const d = doc.data();
+    const m = d.meals || {};
+    if(m.breakfast_date) rows.push({ID:d.id,Meal:"Breakfast",Date:m.breakfast_date,Time:m.breakfast_time||""});
+    if(m.lunch_date) rows.push({ID:d.id,Meal:"Lunch",Date:m.lunch_date,Time:m.lunch_time||""});
+    if(m.dinner_date) rows.push({ID:d.id,Meal:"Dinner",Date:m.dinner_date,Time:m.dinner_time||""});
+  });
+
+  if(!rows.length) return alert("No data available");
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Meal Report");
+  XLSX.writeFile(wb, `meal_report_${today()}.xlsx`);
+}
+
+/* ---------- UI MESSAGE ---------- */
+function showMsg(text,color){
   msgEl.textContent = text;
   msgEl.style.color = color==="green" ? "#bbf7d0" : "#fecaca";
 }
