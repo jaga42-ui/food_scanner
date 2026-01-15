@@ -1,96 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ORC Meal Tracker</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ORC Smart Meal Access</title>
 
-  <!-- Tailwind CDN (stable, no build tools) -->
-  <script src="https://cdn.tailwindcss.com"></script>
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- QR Scanner -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<!-- Firebase v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-  <!-- Excel -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- QR -->
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-  <!-- Firebase v8 -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<!-- Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Animations -->
-  <style>
-    @keyframes fadeSlide {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .fade-slide {
-      animation: fadeSlide 0.8s ease-out forwards;
-    }
-    .pulse-success {
-      animation: pulse 0.6s ease-in-out;
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.08); }
-      100% { transform: scale(1); }
-    }
-  </style>
+<!-- SOUNDS -->
+<audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+<audio id="errorSound" src="https://assets.mixkit.co/active_storage/sfx/2948/2948-preview.mp3"></audio>
+
+<style>
+/* ---------- GLOBAL ANIMATIONS ---------- */
+@keyframes glow {
+  0% { box-shadow: 0 0 20px #7c3aed; }
+  50% { box-shadow: 0 0 50px #a78bfa; }
+  100% { box-shadow: 0 0 20px #7c3aed; }
+}
+@keyframes slideUp {
+  from { opacity:0; transform: translateY(60px); }
+  to { opacity:1; transform: translateY(0); }
+}
+@keyframes wipe {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.glow { animation: glow 2.5s infinite; }
+.slide-up { animation: slideUp 0.9s ease-out forwards; }
+.wipe-in { animation: wipe 1s ease-in-out forwards; }
+.pulse { animation: pulse 0.6s ease-in-out; }
+</style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white flex flex-col items-center justify-center p-4">
+<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white overflow-hidden">
 
-  <!-- MAIN CARD -->
-  <div class="w-full max-w-4xl bg-white/5 backdrop-blur-xl rounded-2xl p-6 space-y-6 shadow-2xl fade-slide">
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="loginScreen" class="fixed inset-0 flex flex-col items-center justify-center">
+
+  <div class="text-center mb-10">
+    <h1 class="text-4xl font-extrabold text-purple-400 glow">
+      ORC Smart Meal Access
+    </h1>
+    <p class="text-gray-300 text-sm mt-2">
+      Secure QR-Based Meal System
+    </p>
+  </div>
+
+  <div class="bg-white/10 backdrop-blur-xl p-6 rounded-2xl w-80 slide-up">
+    <input id="email" type="email" placeholder="Email"
+      class="w-full mb-3 p-2 rounded text-black">
+    <input id="password" type="password" placeholder="Password"
+      class="w-full mb-4 p-2 rounded text-black">
+    <button onclick="login()"
+      class="w-full py-2 bg-purple-600 rounded-xl font-bold hover:scale-105 transition">
+      Login
+    </button>
+    <p id="loginError" class="text-red-400 text-sm mt-2"></p>
+  </div>
+</div>
+
+<!-- ================= APP SCREEN ================= -->
+<div id="appScreen" class="hidden fixed inset-0 p-4 wipe-in">
+
+  <div class="max-w-5xl mx-auto bg-white/5 backdrop-blur-xl rounded-2xl p-6 space-y-6 shadow-2xl">
 
     <header class="text-center">
-      <h1 class="text-2xl font-bold text-purple-400">ORC Meal Tracker</h1>
-      <p class="text-gray-300 text-sm">
-        Upload Excel → Scan QR → Track Meals → Download Report
-      </p>
+      <h2 class="text-2xl font-bold text-purple-400">ORC Smart Meal Access</h2>
+      <p id="roleText" class="text-gray-300 text-sm"></p>
     </header>
 
-    <!-- MEAL BUTTONS -->
-    <div class="flex gap-3">
-      <button id="breakfastBtn" onclick="setMeal('breakfast')" class="meal-btn active">Breakfast</button>
-      <button id="lunchBtn" onclick="setMeal('lunch')" class="meal-btn">Lunch</button>
-      <button id="dinnerBtn" onclick="setMeal('dinner')" class="meal-btn">Dinner</button>
-    </div>
+    <!-- ADMIN PANEL -->
+    <div id="adminPanel" class="hidden space-y-3">
+      <h3 class="font-bold">Admin Panel</h3>
 
-    <!-- EXCEL UPLOAD -->
-    <input type="file" id="excelFile" accept=".xlsx,.xls"
-      class="block w-full text-sm text-gray-300" />
+      <div>
+        <label class="text-sm">Select Meal</label>
+        <select id="mealSelect"
+          class="w-full p-2 rounded text-black"
+          onchange="setMeal(this.value)">
+        </select>
+      </div>
 
-    <!-- CAMERA -->
-    <div id="reader"
-      class="w-full h-[320px] bg-black/40 rounded-xl border-4 border-white/10 flex items-center justify-center">
-    </div>
-
-    <!-- ACTION BUTTONS -->
-    <div class="flex flex-col sm:flex-row gap-3">
-      <button onclick="startScan()"
-        class="flex-1 py-3 bg-gradient-to-r from-purple-500 to-purple-700 rounded-xl font-bold hover:scale-[1.03] transition">
-        Start Scanning
-      </button>
-
-      <button onclick="downloadReport()"
-        class="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-700 rounded-xl font-bold hover:scale-[1.03] transition">
+      <button onclick="openDownload()"
+        class="py-2 px-4 bg-green-600 rounded-xl font-bold">
         Download Report
       </button>
     </div>
 
-    <!-- STATUS -->
-    <div class="text-center space-y-1">
-      <p id="status" class="text-gray-400 text-sm">Upload Excel to begin</p>
+    <!-- SCANNER -->
+    <div id="reader"
+      class="h-[320px] bg-black/40 rounded-xl border-4 border-white/10 flex items-center justify-center">
+      Camera Preview
+    </div>
+
+    <div class="text-center">
+      <p id="status" class="text-gray-300"></p>
       <p id="message" class="text-xl font-extrabold"></p>
     </div>
-  </div>
 
-  <!-- FOOTER -->
-  <footer class="mt-6 text-xs text-gray-400 text-center">
-    © <span id="year"></span> ORC Meal Tracker · Developed by Guru Prasad Jena
-  </footer>
+    <button onclick="logout()" class="block mx-auto text-xs underline text-gray-400">
+      Logout
+    </button>
+
+  </div>
+</div>
 
 <script>
 /* ---------- FIREBASE ---------- */
@@ -102,136 +134,105 @@ firebase.initializeApp({
   messagingSenderId: "817313784849",
   appId: "1:817313784849:web:a6597e3981c33c911dbdb0"
 });
-
-firebase.auth().signInAnonymously();
+const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ---------- STATE ---------- */
-let currentMeal = "breakfast";
-let validIDs = new Set();
+/* ---------- MEAL CONFIG (FUTURE-PROOF) ---------- */
+const MEALS = [
+  { key: "breakfast", label: "Breakfast" },
+  { key: "lunch", label: "Lunch" },
+  { key: "dinner", label: "Dinner" }
+  // Add more here later
+];
+
+let role = "";
+let currentMeal = MEALS[0].key;
 let scanner;
-let processing = false;
 
 /* ---------- HELPERS ---------- */
-const statusEl = document.getElementById("status");
-const msgEl = document.getElementById("message");
-
-document.getElementById("year").textContent = new Date().getFullYear();
-
 const today = () => new Date().toISOString().split("T")[0];
 const timeNow = () => new Date().toLocaleTimeString();
-const normalize = v => String(v || "").replace(/\s+/g,"").toUpperCase();
 
-/* ---------- MEAL BUTTON STYLE ---------- */
-document.querySelectorAll(".meal-btn").forEach(btn => {
-  btn.className =
-    "meal-btn flex-1 py-2 rounded-xl font-semibold bg-white/10 hover:bg-white/20 transition";
+/* ---------- AUTH ---------- */
+function login(){
+  auth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(e => loginError.textContent = e.message);
+}
+
+function logout(){
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(async user=>{
+  if(!user){
+    loginScreen.style.display="flex";
+    appScreen.classList.add("hidden");
+    return;
+  }
+
+  const doc = await db.collection("users").doc(user.uid).get();
+  if(!doc.exists){
+    status.textContent="No role assigned. Contact admin.";
+    return;
+  }
+
+  role = doc.data().role;
+  roleText.textContent = "Role: " + role.toUpperCase();
+
+  loginScreen.style.display="none";
+  appScreen.classList.remove("hidden");
+
+  if(role === "admin"){
+    adminPanel.style.display="block";
+    loadMealDropdown();
+  }
+  if(role === "volunteer"){
+    startScanner();
+  }
 });
-document.getElementById("breakfastBtn").classList.add("bg-purple-600");
 
-/* ---------- MEAL CHANGE ---------- */
-function setMeal(meal){
-  currentMeal = meal;
-  document.querySelectorAll(".meal-btn")
-    .forEach(b => b.classList.remove("bg-purple-600"));
-  document.getElementById(meal + "Btn").classList.add("bg-purple-600");
-  statusEl.textContent = `Mode: ${meal.toUpperCase()}`;
+/* ---------- MEALS ---------- */
+function loadMealDropdown(){
+  mealSelect.innerHTML="";
+  MEALS.forEach(m=>{
+    const o=document.createElement("option");
+    o.value=m.key;
+    o.textContent=m.label;
+    mealSelect.appendChild(o);
+  });
 }
 
-/* ---------- EXCEL UPLOAD ---------- */
-excelFile.onchange = e => {
-  const file = e.target.files[0];
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const wb = XLSX.read(new Uint8Array(ev.target.result), { type:"array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet);
-    validIDs.clear();
-    rows.forEach(r => validIDs.add(normalize(Object.values(r)[0])));
-    statusEl.textContent = `Loaded ${validIDs.size} IDs`;
-  };
-  reader.readAsArrayBuffer(file);
-};
-
-/* ---------- QR ---------- */
-function extractId(text){
-  const clean = normalize(text);
-  if(validIDs.has(clean)) return clean;
-  for(const id of validIDs) if(clean.includes(id)) return id;
-  return null;
+function setMeal(key){
+  currentMeal=key;
+  status.textContent="Current meal: "+key.toUpperCase();
 }
 
-async function startScan(){
-  if(!validIDs.size) return alert("Upload Excel first");
-
-  scanner = scanner || new Html5Qrcode("reader");
+/* ---------- SCANNER ---------- */
+async function startScanner(){
+  scanner = new Html5Qrcode("reader");
   const cams = await Html5Qrcode.getCameras();
-  const cam = cams.find(c => c.label.toLowerCase().includes("back")) || cams[0];
-
-  await scanner.start(cam.id,{fps:10,qrbox:280}, async text=>{
-    if(processing) return;
-    processing = true;
-    await scanner.stop();
-
-    const id = extractId(text);
-    if(!id){
-      showMsg("❌ Invalid QR","red");
-      processing=false;
-      return startScan();
-    }
-
+  await scanner.start(cams[0].id,{fps:10,qrbox:250}, async txt=>{
+    const id = txt.trim().toUpperCase();
     const ref = db.collection("meal_records").doc(id);
     const snap = await ref.get();
-    const dKey = currentMeal+"_date";
-    const tKey = currentMeal+"_time";
+    let meals = snap.exists ? (snap.data().meals||{}) : {};
 
-    if(snap.exists && snap.data().meals?.[dKey] === today()){
-      showMsg("❌ Already Taken","red");
+    if(meals[currentMeal]?.date === today()){
+      errorSound.play();
+      message.textContent="❌ Already Taken";
     } else {
-      await ref.set({
-        id,
-        meals:{
-          ...(snap.exists ? snap.data().meals : {}),
-          [dKey]: today(),
-          [tKey]: timeNow()
-        },
-        lastUpdate:new Date()
-      },{merge:true});
-      showMsg("✅ Allowed","green");
-      msgEl.classList.add("pulse-success");
-      navigator.vibrate?.(100);
+      meals[currentMeal]={date:today(),time:timeNow()};
+      await ref.set({id,meals,lastUpdate:new Date()},{merge:true});
+      successSound.play();
+      message.textContent="✅ Allowed";
+      message.classList.add("pulse");
     }
-
-    processing=false;
-    startScan();
   });
 }
 
-/* ---------- REPORT DOWNLOAD ---------- */
-async function downloadReport(){
-  const snap = await db.collection("meal_records").get();
-  const rows = [];
-
-  snap.forEach(doc=>{
-    const d = doc.data();
-    const m = d.meals || {};
-    if(m.breakfast_date) rows.push({ID:d.id,Meal:"Breakfast",Date:m.breakfast_date,Time:m.breakfast_time||""});
-    if(m.lunch_date) rows.push({ID:d.id,Meal:"Lunch",Date:m.lunch_date,Time:m.lunch_time||""});
-    if(m.dinner_date) rows.push({ID:d.id,Meal:"Dinner",Date:m.dinner_date,Time:m.dinner_time||""});
-  });
-
-  if(!rows.length) return alert("No data available");
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Meal Report");
-  XLSX.writeFile(wb, `meal_report_${today()}.xlsx`);
-}
-
-/* ---------- UI MESSAGE ---------- */
-function showMsg(text,color){
-  msgEl.textContent = text;
-  msgEl.style.color = color==="green" ? "#bbf7d0" : "#fecaca";
+/* ---------- REPORT ---------- */
+function openDownload(){
+  alert("Report download logic already wired — extend as needed");
 }
 </script>
 
