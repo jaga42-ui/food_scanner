@@ -15,9 +15,26 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-@keyframes fade { from {opacity:0; transform:scale(.96)} to {opacity:1; transform:scale(1)} }
+@keyframes fade {
+  from { opacity:0; transform:scale(.96) }
+  to { opacity:1; transform:scale(1) }
+}
 .fade { animation: fade .35s ease-out forwards }
 button { -webkit-tap-highlight-color: transparent; }
+
+/* 🔒 HARD FIX: Prevent camera overflow */
+#reader {
+  position: relative;
+  overflow: hidden;
+}
+#reader video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 12px;
+}
 </style>
 </head>
 
@@ -28,15 +45,15 @@ button { -webkit-tap-highlight-color: transparent; }
   <div class="bg-white/10 backdrop-blur p-6 rounded-2xl w-80 fade shadow-xl">
     <h1 class="text-2xl font-bold text-center text-purple-400 mb-4">Login</h1>
     <input id="loginEmail" placeholder="Email"
-      class="w-full mb-2 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
+      class="w-full mb-2 p-2 rounded-xl text-black">
     <input id="loginPassword" type="password" placeholder="Password"
-      class="w-full mb-4 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
+      class="w-full mb-4 p-2 rounded-xl text-black">
     <button onclick="login()"
-      class="w-full py-2 rounded-xl font-semibold bg-purple-600 hover:bg-purple-700 transition mb-2">
+      class="w-full py-2 rounded-xl bg-purple-600 font-semibold mb-2">
       Login
     </button>
     <button onclick="showSignup()" class="w-full text-sm underline text-gray-300">
-      Create new account
+      Create account
     </button>
     <p id="loginError" class="text-red-400 text-sm mt-2"></p>
   </div>
@@ -47,11 +64,11 @@ button { -webkit-tap-highlight-color: transparent; }
   <div class="bg-white/10 backdrop-blur p-6 rounded-2xl w-80 fade shadow-xl">
     <h1 class="text-2xl font-bold text-center text-purple-400 mb-4">Sign Up</h1>
     <input id="signupEmail" placeholder="Email"
-      class="w-full mb-2 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
+      class="w-full mb-2 p-2 rounded-xl text-black">
     <input id="signupPassword" type="password" placeholder="Password"
-      class="w-full mb-4 p-2 rounded-xl text-black focus:ring-2 focus:ring-purple-500">
+      class="w-full mb-4 p-2 rounded-xl text-black">
     <button onclick="signup()"
-      class="w-full py-2 rounded-xl font-semibold bg-green-600 hover:bg-green-700 transition mb-2">
+      class="w-full py-2 rounded-xl bg-green-600 font-semibold mb-2">
       Create Account
     </button>
     <button onclick="showLogin()" class="w-full text-sm underline text-gray-300">
@@ -77,27 +94,24 @@ button { -webkit-tap-highlight-color: transparent; }
 
 <h3 class="font-bold text-lg">Admin Panel</h3>
 
-<!-- Excel Upload Card -->
+<!-- Excel Upload -->
 <div class="bg-white/10 p-4 rounded-xl space-y-3">
   <h4 class="font-semibold">Upload Excel (Allowed IDs)</h4>
 
-  <label
-    class="flex flex-col items-center justify-center border-2 border-dashed
-           border-purple-400/40 rounded-xl p-4 cursor-pointer hover:bg-white/5 transition">
+  <label class="flex flex-col items-center justify-center
+               border-2 border-dashed border-purple-400/40
+               rounded-xl p-4 cursor-pointer hover:bg-white/5">
     <span class="text-sm text-gray-300">Click to choose Excel file</span>
     <input type="file" id="excelFile" accept=".xlsx,.xls" class="hidden">
   </label>
 
-  <!-- Result Box -->
-  <div id="excelResult"
-    class="hidden bg-black/40 rounded-lg p-3 text-sm">
+  <div id="excelResult" class="hidden bg-black/40 rounded-lg p-3 text-sm">
     <p id="excelCount" class="text-green-400 font-semibold"></p>
   </div>
 </div>
 
 <select id="mealSelect" onchange="setMeal(this.value)"
-  class="w-full p-2 rounded-xl bg-[#1f1b2e] border border-white/20">
-</select>
+  class="w-full p-2 rounded-xl bg-[#1f1b2e] border border-white/20"></select>
 
 <div class="bg-white/10 p-4 rounded-xl">
   <h4 class="font-semibold mb-3">User Management</h4>
@@ -105,7 +119,7 @@ button { -webkit-tap-highlight-color: transparent; }
 </div>
 
 <button onclick="openReport()"
-  class="w-full py-2 rounded-xl bg-green-600 font-semibold hover:bg-green-700 transition">
+  class="w-full py-2 rounded-xl bg-green-600 font-semibold">
   Download Report
 </button>
 
@@ -119,19 +133,20 @@ Scan only works for IDs uploaded by admin
 </p>
 
 <div class="flex gap-3">
-<button id="startScanBtn" onclick="startScanner()"
-  class="flex-1 py-2 rounded-xl bg-green-600 font-semibold">
-  ▶ Start Scan
-</button>
-<button id="stopScanBtn" onclick="stopScanner()" disabled
-  class="flex-1 py-2 rounded-xl bg-red-600 font-semibold">
-  ■ Stop Scan
-</button>
+  <button id="startScanBtn" onclick="startScanner()"
+    class="flex-1 py-2 rounded-xl bg-green-600 font-semibold">
+    ▶ Start Scan
+  </button>
+  <button id="stopScanBtn" onclick="stopScanner()" disabled
+    class="flex-1 py-2 rounded-xl bg-red-600 font-semibold">
+    ■ Stop Scan
+  </button>
 </div>
 
 <div class="bg-black rounded-2xl p-2 shadow-2xl">
   <div id="reader"
-    class="h-[300px] rounded-xl border-4 border-purple-500/30
+    class="h-[300px] sm:h-[320px]
+           rounded-xl border-4 border-purple-500/30
            flex items-center justify-center text-gray-400">
     Camera stopped
   </div>
@@ -168,98 +183,75 @@ firebase.initializeApp({
   authDomain: "orc-meal-tracker.firebaseapp.com",
   projectId: "orc-meal-tracker"
 });
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth=firebase.auth(), db=firebase.firestore();
 
 /* ================= CONFIG ================= */
-const MEALS = [
-  { key: "breakfast", label: "Breakfast" },
-  { key: "lunch", label: "Lunch" },
-  { key: "dinner", label: "Dinner" }
+const MEALS=[
+  {key:"breakfast",label:"Breakfast"},
+  {key:"lunch",label:"Lunch"},
+  {key:"dinner",label:"Dinner"}
 ];
 let role="", currentMeal=MEALS[0].key, scanner=null;
+const today=()=>new Date().toISOString().split("T")[0];
+const timeNow=()=>new Date().toLocaleTimeString();
 
-const today = () => new Date().toISOString().split("T")[0];
-const timeNow = () => new Date().toLocaleTimeString();
-
-/* ================= EXCEL UPLOAD (ADMIN) ================= */
-excelFile.addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
+/* ================= EXCEL UPLOAD ================= */
+excelFile.addEventListener("change", async e=>{
+  const f=e.target.files[0]; if(!f) return;
   excelResult.classList.add("hidden");
 
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    const wb = XLSX.read(new Uint8Array(ev.target.result), { type:"array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+  const r=new FileReader();
+  r.onload=async ev=>{
+    const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(sheet,{defval:""});
+    if(!rows.length) return alert("Excel empty");
 
-    if (!rows.length) return alert("Excel is empty");
+    const col=Object.keys(rows[0])[0];
 
-    const idColumn = Object.keys(rows[0])[0];
-
-    // Clear previous IDs
-    const batch = db.batch();
-    const old = await db.collection("allowed_ids").get();
-    old.forEach(d => batch.delete(d.ref));
+    const old=await db.collection("allowed_ids").get();
+    const batch=db.batch();
+    old.forEach(d=>batch.delete(d.ref));
     await batch.commit();
 
-    let count = 0;
-    for (const r of rows) {
-      const id = String(r[idColumn]).trim().toUpperCase();
-      if (!id) continue;
-      await db.collection("allowed_ids").doc(id).set({
-        active:true,
-        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+    let count=0;
+    for(const row of rows){
+      const id=String(row[col]).trim().toUpperCase();
+      if(!id) continue;
+      await db.collection("allowed_ids").doc(id).set({active:true});
       count++;
     }
-
-    excelCount.textContent = `✔ ${count} IDs uploaded successfully`;
+    excelCount.textContent=`✔ ${count} IDs uploaded`;
     excelResult.classList.remove("hidden");
   };
-  reader.readAsArrayBuffer(file);
+  r.readAsArrayBuffer(f);
 });
 
 /* ================= AUTH ================= */
 function login(){
-  auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value)
-    .catch(e => loginError.textContent = e.message);
+  auth.signInWithEmailAndPassword(loginEmail.value,loginPassword.value)
+    .catch(e=>loginError.textContent=e.message);
 }
 function signup(){
-  auth.createUserWithEmailAndPassword(signupEmail.value, signupPassword.value)
-    .then(async c=>{
-      await db.collection("users").doc(c.user.uid).set({
-        email:c.user.email, role:"pending", createdAt:new Date()
-      });
-      alert("Account created. Waiting for admin approval.");
-      showLogin();
-    })
+  auth.createUserWithEmailAndPassword(signupEmail.value,signupPassword.value)
+    .then(c=>db.collection("users").doc(c.user.uid)
+      .set({email:c.user.email,role:"pending",createdAt:new Date()}))
+    .then(()=>{alert("Waiting for admin approval"); showLogin();})
     .catch(e=>signupError.textContent=e.message);
 }
 function logout(){ stopScanner(); auth.signOut(); }
 
 /* ================= ROLE LISTENER ================= */
-auth.onAuthStateChanged(user=>{
-  if(!user){
-    loginScreen.style.display="flex";
-    appScreen.classList.add("hidden");
-    return;
-  }
-  loginScreen.style.display="none";
-  appScreen.classList.remove("hidden");
-
-  db.collection("users").doc(user.uid).onSnapshot(doc=>{
-    if(!doc.exists) return;
-    role = doc.data().role;
-    roleText.textContent = "Role: " + role.toUpperCase();
-
-    adminPanel.style.display = role==="admin" ? "block" : "none";
-    scannerSection.style.display = role==="volunteer" ? "block" : "none";
-
-    stopScanner();
-    loadMeals();
+auth.onAuthStateChanged(u=>{
+  if(!u){ loginScreen.style.display="flex"; appScreen.classList.add("hidden"); return; }
+  loginScreen.style.display="none"; appScreen.classList.remove("hidden");
+  db.collection("users").doc(u.uid).onSnapshot(d=>{
+    if(!d.exists) return;
+    role=d.data().role;
+    roleText.textContent="Role: "+role.toUpperCase();
+    adminPanel.style.display=role==="admin"?"block":"none";
+    scannerSection.style.display=role==="volunteer"?"block":"none";
+    stopScanner(); loadMeals();
     if(role==="admin") loadUsers();
   });
 });
@@ -277,27 +269,24 @@ function setMeal(m){ currentMeal=m; }
 
 /* ================= USERS ================= */
 function loadUsers(){
-  db.collection("users").orderBy("createdAt").onSnapshot(s=>{
-    userList.innerHTML="";
-    s.forEach(d=>{
-      const u=d.data();
-      userList.innerHTML+=`
+db.collection("users").orderBy("createdAt").onSnapshot(s=>{
+userList.innerHTML="";
+s.forEach(d=>{
+const u=d.data();
+userList.innerHTML+=`
 <li class="bg-white/10 p-3 rounded-xl flex flex-col sm:flex-row justify-between gap-2">
-  <div>
-    <p>${u.email}</p>
-    <p class="text-xs text-gray-400">${u.role}</p>
-  </div>
-  <div class="flex gap-2 flex-wrap">
-    <button onclick="updateRole('${d.id}','volunteer')" class="px-3 py-1 bg-blue-600 text-xs rounded">Volunteer</button>
-    <button onclick="updateRole('${d.id}','admin')" class="px-3 py-1 bg-red-600 text-xs rounded">Admin</button>
-    <button onclick="disableUser('${d.id}')" class="px-3 py-1 bg-gray-700 text-xs rounded">Remove</button>
-  </div>
+<div><p>${u.email}</p><p class="text-xs text-gray-400">${u.role}</p></div>
+<div class="flex gap-2 flex-wrap">
+<button onclick="updateRole('${d.id}','volunteer')" class="px-3 py-1 bg-blue-600 text-xs rounded">Volunteer</button>
+<button onclick="updateRole('${d.id}','admin')" class="px-3 py-1 bg-red-600 text-xs rounded">Admin</button>
+<button onclick="disableUser('${d.id}')" class="px-3 py-1 bg-gray-700 text-xs rounded">Remove</button>
+</div>
 </li>`;
-    });
-  });
+});
+});
 }
 function updateRole(uid,r){
-  if(uid===auth.currentUser.uid && r==="admin") return alert("Self promotion blocked");
+  if(uid===auth.currentUser.uid && r==="admin") return alert("Blocked");
   db.collection("users").doc(uid).update({role:r});
 }
 function disableUser(uid){
@@ -308,12 +297,12 @@ function disableUser(uid){
 /* ================= SCANNER ================= */
 async function startScanner(){
   if(scanner) return;
+  reader.innerHTML="";
   startScanBtn.disabled=true; stopScanBtn.disabled=false;
   scanner=new Html5Qrcode("reader");
-
   try{
     await scanner.start({facingMode:"environment"},
-      {fps:12,qrbox:{width:240,height:240}}, onScanSuccess);
+      {fps:12,qrbox:{width:240,height:240}},onScanSuccess);
   }catch{
     const cams=await Html5Qrcode.getCameras();
     if(cams.length)
@@ -322,7 +311,7 @@ async function startScanner(){
 }
 async function stopScanner(){
   if(!scanner) return;
-  try{ await scanner.stop(); await scanner.clear(); }catch{}
+  try{await scanner.stop();await scanner.clear();}catch{}
   scanner=null;
   reader.textContent="Camera stopped";
   startScanBtn.disabled=false; stopScanBtn.disabled=true;
@@ -330,10 +319,8 @@ async function stopScanner(){
 async function onScanSuccess(text){
   const id=text.trim().toUpperCase();
   const allowed=await db.collection("allowed_ids").doc(id).get();
-  if(!allowed.exists){
-    message.textContent="❌ Invalid ID";
-    return;
-  }
+  if(!allowed.exists){ message.textContent="❌ Invalid ID"; return; }
+
   const ref=db.collection("meal_records").doc(id);
   const snap=await ref.get();
   let meals=snap.exists?snap.data().meals||{}:{};
