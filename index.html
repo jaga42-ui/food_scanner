@@ -1,620 +1,176 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>ORC Meal Tracker — Purple & Gray</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ORC Meal Tracker</title>
 
-  <!-- Tailwind for utilities -->
+  <!-- Tailwind CDN (stable, no build tools) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- html5-qrcode -->
+
+  <!-- QR Scanner -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- xlsx -->
+
+  <!-- Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase v8 (non-module) for local/gh-pages friendly usage -->
+  <!-- Firebase v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-    <style>
-    :root {
-      --bg1: #1f1b2e;
-      --bg2: #36284a;
-      --muted: #9aa0a6;
-      --accent: #9b5cf6;
-      --accent-2: #6d28d9;
-      --card-bg: rgba(255,255,255,0.02);
-    }
-
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto;
-      background: linear-gradient(180deg, var(--bg1), var(--bg2));
-      color: #e6eef8;
-      scroll-behavior: smooth;
-    }
-
-    .container {
-      max-width: 980px;
-      margin: 18px auto;
-      padding: 18px;
-      box-sizing: border-box;
-    }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      border-radius: 14px;
-      padding: 18px;
-      border: 1px solid rgba(255,255,255,0.04);
-      box-shadow: 0 12px 40px rgba(2,6,23,0.6);
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      text-align: center;
-    }
-
-    header h1 {
-      color: var(--accent);
-      margin: 0;
-      font-size: 20px;
-    }
-
-    header p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 18px;
-      margin-top: 12px;
-      align-items: start;
-    }
-
-    .controls {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .meals {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .meal-btn {
-      flex: 1;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.03);
-      background: transparent;
-      color: #f5f7ff;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all .12s;
-      text-align: center;
-    }
-
-    .meal-btn:hover {
-      transform: translateY(-3px);
-    }
-
-    .meal-btn.active {
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      color: white;
-      box-shadow: 0 10px 30px rgba(109,40,217,0.18);
-    }
-
-    .file-box {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px dashed rgba(255,255,255,0.03);
-      background: var(--card-bg);
-    }
-
-    .file-box .note {
-      color: var(--muted);
-      font-size: 13px;
-      flex: 1;
-    }
-
-    input[type="file"] {
-      font-size: 13px;
-      color: var(--muted);
-      background: transparent;
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: space-between;
-    }
-
-    .btn {
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 0;
-      cursor: pointer;
-      font-weight: 700;
-      color: white;
-      min-width: 120px;
-      box-shadow: 0 8px 20px rgba(6,6,12,0.45);
-      transition: transform .08s, background .2s;
-    }
-
-    .btn:active { transform: translateY(1px); }
-    .btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
-
-    .btn-start { background: linear-gradient(90deg, #10b981, #059669); }
-    .btn-stop { background: linear-gradient(90deg, #ef4444, #dc2626); }
-    .btn-download { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-
-    .camera {
-      border-radius: 12px;
-      padding: 10px;
-      border: 1px solid rgba(255,255,255,0.03);
-      background: linear-gradient(180deg, #071427, #0b1220);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    #reader {
-      width: 100%;
-      height: 420px;
-      border-radius: 10px;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #cfe7ff;
-      border: 4px solid rgba(255,255,255,0.04);
-    }
-
-    .status {
-      background: rgba(255,255,255,0.02);
-      padding: 10px;
-      border-radius: 10px;
-      text-align: center;
-      color: var(--muted);
-    }
-
-    .bigmsg {
-      font-weight: 800;
-      font-size: 20px;
-      margin-top: 6px;
-      word-break: break-word;
-    }
-
-    /* Download popup modal */
-    .modal-backdrop {
-      position: fixed;
-      left: 0; right: 0; top: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 60;
-      padding: 10px;
-    }
-
-    .modal {
-      background: white;
-      color: #0b1220;
-      border-radius: 12px;
-      padding: 16px;
-      width: 100%;
-      max-width: 320px;
-      box-shadow: 0 8px 40px rgba(2,6,23,0.5);
-    }
-
-    .modal h3 {
-      margin: 0 0 8px 0;
-      color: #111827;
-    }
-
-    .modal .opt {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 0;
-    }
-
-    /* ----------- Responsive Enhancements ----------- */
-    @media (max-width: 880px) {
-      .layout {
-        grid-template-columns: 1fr;
-        gap: 20px;
-      }
-
-      .controls, .camera {
-        width: 100%;
-      }
-
-      #reader {
-        height: 320px;
-      }
-    }
-
-    @media (max-width: 600px) {
-      header {
-        flex-direction: column;
-        text-align: center;
-      }
-
-      .container {
-        padding: 10px;
-      }
-
-      .meals {
-        flex-direction: column;
-      }
-
-      .meal-btn {
-        width: 100%;
-      }
-
-      .btn-row {
-        flex-direction: column;
-      }
-
-      .btn {
-        width: 100%;
-        min-width: unset;
-        padding: 12px;
-      }
-
-      .file-box {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      #reader {
-        height: 280px;
-      }
-    }
-
-    @media (max-width: 400px) {
-      #reader { height: 240px; }
-      header h1 { font-size: 18px; }
-      .bigmsg { font-size: 16px; }
-      .btn { font-size: 14px; padding: 10px; }
-    }
-  </style>
-
 </head>
-<body>
-  <div class="container">
-    <div class="card">
-      <header>
-        <div>
-          <h1>ORC Meal Tracker</h1>
-          <p>Upload Excel → Scan QR → Allowed / Already Taken — then Download DB</p>
-        </div>
-        <div style="text-align:right;color:var(--muted);font-size:13px">Collection: <strong>meal_records</strong></div>
-      </header>
 
-      <div class="layout">
-        <!-- CONTROLS -->
-        <div class="controls">
-          <div class="meals" role="tablist" aria-label="Meal selector">
-            <button id="breakfastBtn" class="meal-btn active" aria-pressed="true">Breakfast</button>
-            <button id="lunchBtn" class="meal-btn" aria-pressed="false">Lunch</button>
-            <button id="dinnerBtn" class="meal-btn" aria-pressed="false">Dinner</button>
-          </div>
+<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white flex items-center justify-center p-4">
 
-          <div class="file-box" aria-label="Excel upload">
-            <div class="note">Upload Excel (first sheet has ID column)</div>
-            <input id="excelFile" type="file" accept=".xlsx,.xls" />
-          </div>
+  <div class="w-full max-w-4xl bg-white/5 backdrop-blur-xl rounded-2xl p-6 space-y-6 shadow-2xl">
 
-          <div class="btn-row" style="margin-top:6px">
-            <button id="startBtn" class="btn btn-start" disabled>Start Scanning</button>
-            <button id="stopBtn" class="btn btn-stop" disabled>Stop</button>
-            <button id="downloadBtn" class="btn btn-download">Download Database</button>
-          </div>
+    <header class="text-center">
+      <h1 class="text-2xl font-bold text-purple-400">ORC Meal Tracker</h1>
+      <p class="text-gray-300 text-sm">Upload Excel → Scan QR → Track Meals</p>
+    </header>
 
-          <div id="fileStatus" class="status" style="margin-top:8px">No file loaded</div>
-        </div>
-
-        <!-- CAMERA -->
-        <div class="camera">
-          <div id="reader">Camera preview will appear here</div>
-
-          <div class="status">
-            <div id="statusText">Please upload Excel to begin.</div>
-            <div id="message" class="bigmsg" aria-live="polite"></div>
-          </div>
-        </div>
-      </div>
+    <!-- Meal Buttons -->
+    <div class="flex gap-3">
+      <button onclick="setMeal('breakfast')" id="breakfastBtn" class="meal-btn active">Breakfast</button>
+      <button onclick="setMeal('lunch')" id="lunchBtn" class="meal-btn">Lunch</button>
+      <button onclick="setMeal('dinner')" id="dinnerBtn" class="meal-btn">Dinner</button>
     </div>
-  </div>
 
-  <!-- Modal (hidden by default) -->
-  <div id="downloadModal" style="display:none;" class="modal-backdrop" role="dialog" aria-modal="true">
-    <div class="modal">
-      <h3>Download Database</h3>
-      <div style="font-size:13px;color:#374151">Choose which records to download:</div>
-      <div class="opt"><input type="radio" name="dlOpt" id="dlToday" value="today" checked> <label for="dlToday">Today's Records</label></div>
-      <div class="opt"><input type="radio" name="dlOpt" id="dlAll" value="all"> <label for="dlAll">All Records</label></div>
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
-        <button id="cancelDl" style="padding:8px 10px;border-radius:8px;border:1px solid #e5e7eb;background:transparent">Cancel</button>
-        <button id="confirmDl" style="padding:8px 10px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white">Download</button>
-      </div>
+    <!-- Upload -->
+    <input type="file" id="excelFile" accept=".xlsx,.xls" class="block w-full text-sm text-gray-300" />
+
+    <!-- Camera -->
+    <div id="reader" class="w-full h-[320px] bg-black/40 rounded-xl border-4 border-white/10 flex items-center justify-center"></div>
+
+    <!-- Actions -->
+    <button onclick="startScan()" class="w-full py-3 bg-gradient-to-r from-purple-500 to-purple-700 rounded-xl font-bold hover:scale-[1.02] transition">
+      Start Scanning
+    </button>
+
+    <!-- Status -->
+    <div class="text-center space-y-1">
+      <p id="status" class="text-gray-400 text-sm">Upload Excel to begin</p>
+      <p id="message" class="text-xl font-extrabold"></p>
     </div>
+
   </div>
 
 <script>
-/* ------------- FIREBASE (v8 non-module) ------------- */
-const firebaseConfig = {
+/* ---------- STYLES ---------- */
+document.querySelectorAll('.meal-btn').forEach(b => {
+  b.className = "meal-btn flex-1 py-2 rounded-xl font-semibold bg-white/10 hover:bg-white/20 transition";
+});
+document.getElementById('breakfastBtn').classList.add("bg-purple-600");
+
+/* ---------- FIREBASE ---------- */
+firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
   authDomain: "orc-meal-tracker.firebaseapp.com",
   projectId: "orc-meal-tracker",
   storageBucket: "orc-meal-tracker.firebasestorage.app",
   messagingSenderId: "817313784849",
-  appId: "1:817313784849:web:a6597e3981c33c911dbdb0",
-  measurementId: "G-H4X37NMPRH"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-firebase.auth().signInAnonymously().catch(e => console.error('Auth error', e));
-
-/* ------------- SHARED UI & STATE ------------- */
-const excelFile = document.getElementById('excelFile');
-const fileStatus = document.getElementById('fileStatus');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const statusText = document.getElementById('statusText');
-const messageEl = document.getElementById('message');
-const readerElId = 'reader';
-
-const breakfastBtn = document.getElementById('breakfastBtn');
-const lunchBtn = document.getElementById('lunchBtn');
-const dinnerBtn = document.getElementById('dinnerBtn');
-
-const downloadModal = document.getElementById('downloadModal');
-const cancelDl = document.getElementById('cancelDl');
-const confirmDl = document.getElementById('confirmDl');
-
-let validIDs = new Set();
-let currentMeal = 'breakfast';
-let html5QrCode = null;
-let scannerActive = false;
-
-/* helpers */
-function todayKey(){ return new Date().toISOString().split('T')[0]; }
-function nowTime(){ return new Date().toLocaleTimeString(); }
-function setStatus(t){ statusText.textContent = t; }
-function showMessage(text, type='info'){
-  messageEl.textContent = text;
-  if(type === 'success') messageEl.style.color = '#bbf7d0';
-  else if(type === 'error') messageEl.style.color = '#ffd6d6';
-  else messageEl.style.color = '#e0e7ff';
-  setTimeout(()=> { if(messageEl.textContent === text) messageEl.textContent = ''; }, 2800);
-}
-
-/* ------------- EXCEL UPLOAD (xlsx) ------------- */
-excelFile.addEventListener('change', (ev) => {
-  const f = ev.target.files && ev.target.files[0];
-  if(!f) return;
-  fileStatus.textContent = 'Loading Excel...';
-  const fr = new FileReader();
-  fr.onload = (e) => {
-    try {
-      let workbook;
-      try {
-        const data = new Uint8Array(e.target.result);
-        workbook = XLSX.read(data, { type: 'array' });
-      } catch(_){
-        workbook = XLSX.read(e.target.result, { type: 'binary' });
-      }
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      if(!json || json.length === 0){ fileStatus.textContent = 'Excel empty or no rows.'; return; }
-
-      // auto detect column
-      const headerCandidates = ['id','ID','Id','registration_id','registrationId','reg','reg_id','regid','student_id','studentid'];
-      const firstRowKeys = Object.keys(json[0]).map(k => k.trim());
-      let idCol = null;
-      for(const k of firstRowKeys) if(headerCandidates.includes(k)) { idCol = k; break; }
-      if(!idCol) idCol = firstRowKeys[0];
-
-      validIDs = new Set();
-      for(const row of json){
-        const raw = row[idCol];
-        if(raw === undefined || raw === null) continue;
-        const s = String(raw).trim();
-        if(!s) continue;
-        validIDs.add(s.toUpperCase());
-      }
-
-      fileStatus.textContent = `✅ Loaded ${validIDs.size} IDs (column: ${idCol})`;
-      setStatus('Ready — click Start Scanning');
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    } catch(err){
-      console.error('Excel parse failed', err);
-      fileStatus.textContent = 'Failed to parse Excel.';
-    }
-  };
-  try { fr.readAsArrayBuffer(f); } catch(e) { fr.readAsBinaryString(f); }
+  appId: "1:817313784849:web:a6597e3981c33c911dbdb0"
 });
 
-/* ------------- QR ID extraction (robust) ------------- */
-function extractId(scanned){
-  if(!scanned) return null;
-  const raw = String(scanned).trim();
-  const up = raw.toUpperCase();
-  if(validIDs.has(up)) return up;
-  const m = raw.match(/(?:ID|REGISTRATION_ID|REGID|REG|UID|STUDENT_ID)=([A-Za-z0-9\-_]+)/i);
-  if(m && m[1]){ const cand = m[1].toUpperCase(); if(validIDs.has(cand)) return cand; }
-  const tokens = up.split(/[^A-Z0-9\-_]+/).filter(Boolean);
-  for(const t of tokens) if(validIDs.has(t)) return t;
-  if(validIDs.size > 0 && validIDs.size <= 5000){
-    for(const id of validIDs) if(up.includes(id)) return id;
-  }
+firebase.auth().signInAnonymously();
+const db = firebase.firestore();
+
+/* ---------- STATE ---------- */
+let currentMeal = "breakfast";
+let validIDs = new Set();
+let scanner;
+let processing = false;
+
+/* ---------- HELPERS ---------- */
+const statusEl = document.getElementById("status");
+const msgEl = document.getElementById("message");
+
+const today = () => new Date().toISOString().split("T")[0];
+const timeNow = () => new Date().toLocaleTimeString();
+const normalize = v => String(v || "").replace(/\s+/g,"").toUpperCase();
+
+/* ---------- MEAL ---------- */
+function setMeal(meal){
+  currentMeal = meal;
+  document.querySelectorAll('.meal-btn').forEach(b => b.classList.remove("bg-purple-600"));
+  document.getElementById(meal+"Btn").classList.add("bg-purple-600");
+  statusEl.textContent = `Mode: ${meal.toUpperCase()}`;
+}
+
+/* ---------- EXCEL ---------- */
+excelFile.onchange = e => {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb = XLSX.read(new Uint8Array(ev.target.result), { type:"array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+    validIDs.clear();
+    rows.forEach(r => validIDs.add(normalize(Object.values(r)[0])));
+    statusEl.textContent = `Loaded ${validIDs.size} IDs`;
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+/* ---------- QR ---------- */
+function extractId(text){
+  const clean = normalize(text);
+  if(validIDs.has(clean)) return clean;
+  for(const id of validIDs) if(clean.includes(id)) return id;
   return null;
 }
 
-/* ------------- SCANNER start/stop ------------- */
-async function startScanner(){
-  if(validIDs.size === 0){ setStatus('Upload Excel first'); return; }
-  setStatus('Starting camera — allow permission');
-  try {
-    if(!html5QrCode) html5QrCode = new Html5Qrcode(readerElId);
-    const cams = await Html5Qrcode.getCameras();
-    if(!cams || cams.length === 0) throw new Error('No cameras found');
-    let cam = cams[0];
-    for(const c of cams){ const lab = (c.label||'').toLowerCase(); if(lab.includes('back')||lab.includes('rear')||lab.includes('environment')) { cam = c; break } }
-    await html5QrCode.start(cam.id, { fps: 10, qrbox: { width: 280, height: 280 }, formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE] }, onScanSuccess);
-    scannerActive = true;
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    setStatus('Camera live — scan QR');
-  } catch(err){
-    console.error('Start scanner error', err);
-    setStatus('Camera error: ' + (err && err.message ? err.message : String(err)));
-    showMessage('Camera permission/device error', 'error');
-  }
-}
+async function startScan(){
+  if(!validIDs.size) return alert("Upload Excel first");
 
-async function stopScanner(){
-  try { if(html5QrCode) await html5QrCode.stop(); } catch(e){ /* ignore */ }
-  scannerActive = false;
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-  setStatus('Scanner stopped');
-}
+  scanner = scanner || new Html5Qrcode("reader");
+  const cams = await Html5Qrcode.getCameras();
+  const cam = cams.find(c => c.label.toLowerCase().includes("back")) || cams[0];
 
-/* ------------- on successful scan ------------- */
-async function onScanSuccess(decodedText, decodedResult){
-  try { if(html5QrCode) await html5QrCode.stop(); } catch(e){/*ignore*/ }
-  scannerActive = false;
-  setStatus('Processing...');
-  const found = extractId(decodedText);
-  if(!found){
-    showMessage('❌ Invalid QR', 'error');
-    setStatus('Invalid QR — ready');
-    setTimeout(()=> startScanner(), 1200);
-    return;
-  }
+  await scanner.start(cam.id,{fps:10,qrbox:280}, async text=>{
+    if(processing) return;
+    processing = true;
+    await scanner.stop();
 
-  try {
-    const docRef = db.collection('meal_records').doc(found);
-    const snap = await docRef.get();
-    const date = todayKey();
-    const mealDateKey = `${currentMeal}_date`;
-    const mealTimeKey = `${currentMeal}_time`;
-
-    if(snap.exists){
-      const data = snap.data();
-      const meals = data.meals || {};
-      if(meals[mealDateKey] === date){
-        showMessage('❌ Already Taken', 'error');
-      } else {
-        const updatedMeals = Object.assign({}, meals, { [mealDateKey]: date, [mealTimeKey]: nowTime() });
-        await docRef.update({ meals: updatedMeals, lastUpdate: new Date() });
-        showMessage('✅ Allowed', 'success');
-      }
-    } else {
-      const newMeals = { [mealDateKey]: date, [mealTimeKey]: nowTime() };
-      await docRef.set({ id: found, meals: newMeals, registeredAt: new Date(), lastUpdate: new Date() });
-      showMessage('✅ Allowed', 'success');
+    const id = extractId(text);
+    if(!id){
+      msg("❌ Invalid QR","red");
+      processing=false;
+      return startScan();
     }
-    setStatus(`Processed ${found} — ready.`);
-  } catch(err){
-    console.error('Save error', err);
-    showMessage('❌ Save failed', 'error');
-    setStatus('Save failed — check console');
-  } finally {
-    setTimeout(()=> startScanner(), 900);
-  }
-}
 
-/* ------------- meal buttons behaviour ------------- */
-function setActiveMeal(btnEl, mealName){
-  [breakfastBtn, lunchBtn, dinnerBtn].forEach(b => b.classList.remove('active'));
-  btnEl.classList.add('active');
-  currentMeal = mealName;
-  setStatus(`Mode: ${mealName.toUpperCase()}`);
-  // restart scanner lightly
-  try { if(html5QrCode) html5QrCode.stop(); } catch(e){}
-  setTimeout(()=> { if(!scannerActive) startScanner(); }, 300);
-}
-breakfastBtn.addEventListener('click', ()=> setActiveMeal(breakfastBtn, 'breakfast'));
-lunchBtn.addEventListener('click', ()=> setActiveMeal(lunchBtn, 'lunch'));
-dinnerBtn.addEventListener('click', ()=> setActiveMeal(dinnerBtn, 'dinner'));
+    const ref = db.collection("meal_records").doc(id);
+    const snap = await ref.get();
+    const dKey = currentMeal+"_date";
+    const tKey = currentMeal+"_time";
 
-/* ------------- start/stop buttons ------------- */
-startBtn.addEventListener('click', startScanner);
-stopBtn.addEventListener('click', stopScanner);
-
-/* ------------- Download modal flow ------------- */
-downloadBtn.addEventListener('click', ()=> { downloadModal.style.display = 'flex'; });
-cancelDl.addEventListener('click', ()=> { downloadModal.style.display = 'none'; });
-
-confirmDl.addEventListener('click', async () => {
-  const choice = document.querySelector('input[name="dlOpt"]:checked').value;
-  confirmDl.disabled = true;
-  confirmDl.textContent = 'Preparing...';
-  try {
-    const snaps = await db.collection('meal_records').get();
-    const rows = [];
-    snaps.forEach(s => {
-      const d = s.data();
-      const meals = d.meals || {};
-      if(choice === 'today'){
-        const td = todayKey();
-        if(meals.breakfast_date === td) rows.push({ ID: d.id||s.id, Meal:'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time||'' });
-        if(meals.lunch_date === td) rows.push({ ID: d.id||s.id, Meal:'Lunch', Date: meals.lunch_date, Time: meals.lunch_time||'' });
-        if(meals.dinner_date === td) rows.push({ ID: d.id||s.id, Meal:'Dinner', Date: meals.dinner_date, Time: meals.dinner_time||'' });
-      } else {
-        if(meals.breakfast_date) rows.push({ ID: d.id||s.id, Meal:'Breakfast', Date: meals.breakfast_date, Time: meals.breakfast_time||'' });
-        if(meals.lunch_date) rows.push({ ID: d.id||s.id, Meal:'Lunch', Date: meals.lunch_date, Time: meals.lunch_time||'' });
-        if(meals.dinner_date) rows.push({ ID: d.id||s.id, Meal:'Dinner', Date: meals.dinner_date, Time: meals.dinner_time||'' });
-      }
-    });
-
-    if(rows.length === 0){
-      alert('No matching records found.');
-    } else {
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'MealReport');
-      const fname = `meal_report_${choice}_${todayKey()}.xlsx`;
-      XLSX.writeFile(wb, fname);
+    if(snap.exists && snap.data().meals?.[dKey] === today()){
+      msg("❌ Already Taken","red");
+    }else{
+      await ref.set({
+        id,
+        meals:{
+          ...(snap.exists ? snap.data().meals : {}),
+          [dKey]: today(),
+          [tKey]: timeNow()
+        },
+        lastUpdate:new Date()
+      },{merge:true});
+      msg("✅ Allowed","green");
+      navigator.vibrate?.(100);
     }
-  } catch(err){
-    console.error('Export failed', err);
-    alert('Export failed — check console.');
-  } finally {
-    confirmDl.disabled = false;
-    confirmDl.textContent = 'Download';
-    downloadModal.style.display = 'none';
-  }
-});
 
-/* initialize UI status */
-setStatus('Upload Excel (ID column) to begin.');
+    processing=false;
+    startScan();
+  });
+}
 
-/* ensure page won't try camera until Excel loaded */
-/* done */
+/* ---------- UI ---------- */
+function msg(text,color){
+  msgEl.textContent = text;
+  msgEl.style.color = color==="green" ? "#bbf7d0" : "#fecaca";
+}
 </script>
+
 </body>
 </html>
