@@ -1,16 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORC Smart Meal System</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
-
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -35,13 +33,11 @@
     <input id="email" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
     <input id="password" type="password" class="w-full p-2 mb-4 rounded text-black" placeholder="Password">
 
-    <button onclick="login()"
-      class="w-full bg-purple-600 py-2 rounded font-bold mb-2">
+    <button onclick="login()" class="w-full bg-purple-600 py-2 rounded font-bold mb-2">
       Login
     </button>
 
-    <button onclick="signup()"
-      class="w-full border border-white/40 py-2 rounded font-bold">
+    <button onclick="signup()" class="w-full border border-white/40 py-2 rounded font-bold">
       Sign Up
     </button>
 
@@ -63,85 +59,47 @@
 
       <h3 class="font-bold text-lg">Admin Panel</h3>
 
-      <!-- MEAL DROPDOWN -->
-      <div>
-        <label class="text-sm">Active Meal</label>
-        <select id="mealSelect" onchange="setMeal(this.value)"
-          class="w-full bg-[#1f1b2e] p-2 rounded border border-white/20">
-        </select>
-      </div>
+      <!-- MEAL SELECT -->
+      <select id="mealSelect" onchange="setMeal(this.value)"
+        class="w-full bg-[#1f1b2e] p-2 rounded border border-white/20"></select>
 
-      <!-- ROLE MANAGEMENT -->
+      <!-- USER MANAGEMENT -->
       <div class="bg-black/30 p-4 rounded">
-        <h4 class="font-semibold mb-2">Assign Roles</h4>
-
-        <input id="roleEmail"
-          placeholder="User email"
-          class="w-full p-2 mb-2 rounded text-black">
-
-        <div class="flex gap-2">
-          <button onclick="setRole('volunteer')"
-            class="flex-1 bg-blue-600 py-2 rounded">
-            Make Volunteer
-          </button>
-
-          <button onclick="setRole('admin')"
-            class="flex-1 bg-red-600 py-2 rounded">
-            Make Admin
-          </button>
-        </div>
+        <h4 class="font-semibold mb-2">User Management</h4>
+        <ul id="userList" class="space-y-2 text-sm"></ul>
       </div>
 
-      <button onclick="openReport()"
-        class="bg-green-600 py-2 rounded font-bold">
+      <button onclick="openReport()" class="bg-green-600 py-2 rounded font-bold">
         Download Report
       </button>
     </div>
 
-    <!-- SCANNER (VOLUNTEER ONLY) -->
+    <!-- SCANNER -->
     <div id="scannerSection" class="hidden">
-      <div id="reader"
-        class="h-[320px] bg-black rounded flex items-center justify-center">
+      <div id="reader" class="h-[320px] bg-black rounded flex items-center justify-center">
         Camera Preview
       </div>
     </div>
 
     <div class="text-center">
-      <p id="status"></p>
       <p id="message" class="text-xl font-bold"></p>
     </div>
 
-    <button onclick="logout()"
-      class="text-xs underline block mx-auto">
-      Logout
-    </button>
-
-    <p class="text-center text-xs text-gray-500">
-      © 2026 ORC Smart Meal System
-    </p>
+    <button onclick="logout()" class="text-xs underline block mx-auto">Logout</button>
   </div>
 </div>
 
 <!-- REPORT MODAL -->
-<div id="reportModal"
-  class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
+<div id="reportModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
   <div class="bg-white text-black p-5 rounded-xl w-72">
     <h3 class="font-bold mb-3">Download Report</h3>
-
-    <button onclick="downloadReport('today')"
-      class="w-full bg-purple-600 text-white py-2 rounded mb-2">
+    <button onclick="downloadReport('today')" class="w-full bg-purple-600 text-white py-2 rounded mb-2">
       Today Report
     </button>
-
-    <button onclick="downloadReport('all')"
-      class="w-full bg-gray-800 text-white py-2 rounded mb-2">
+    <button onclick="downloadReport('all')" class="w-full bg-gray-800 text-white py-2 rounded mb-2">
       All Records
     </button>
-
-    <button onclick="closeReport()"
-      class="w-full text-sm underline">
-      Cancel
-    </button>
+    <button onclick="closeReport()" class="w-full text-sm underline">Cancel</button>
   </div>
 </div>
 
@@ -152,11 +110,10 @@ firebase.initializeApp({
   authDomain: "orc-meal-tracker.firebaseapp.com",
   projectId: "orc-meal-tracker"
 });
-
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* MEALS */
+/* CONFIG */
 const MEALS = [
   { key: "breakfast", label: "Breakfast" },
   { key: "lunch", label: "Lunch" },
@@ -179,8 +136,13 @@ function login() {
 
 function signup() {
   auth.createUserWithEmailAndPassword(email.value, password.value)
-    .then(() => {
-      alert("Account created. Contact admin for access.");
+    .then(async cred => {
+      await db.collection("users").doc(cred.user.uid).set({
+        email: cred.user.email,
+        role: "pending",
+        createdAt: new Date()
+      });
+      alert("Account created. Waiting for admin approval.");
     })
     .catch(e => loginError.textContent = e.message);
 }
@@ -190,7 +152,8 @@ function logout() {
   auth.signOut();
 }
 
-auth.onAuthStateChanged(async user => {
+/* REAL-TIME ROLE LISTENER */
+auth.onAuthStateChanged(user => {
   if (!user) {
     loginScreen.style.display = "flex";
     appScreen.classList.add("hidden");
@@ -200,30 +163,37 @@ auth.onAuthStateChanged(async user => {
   loginScreen.style.display = "none";
   appScreen.classList.remove("hidden");
 
-  const doc = await db.collection("users").doc(user.uid).get();
+  db.collection("users").doc(user.uid).onSnapshot(async doc => {
+    if (!doc.exists) {
+      roleText.textContent = "Waiting for admin approval";
+      adminPanel.style.display = "none";
+      scannerSection.style.display = "none";
+      return;
+    }
 
-  if (!doc.exists) {
-    roleText.textContent = "Role: NONE (Waiting for admin approval)";
-    adminPanel.style.display = "none";
-    scannerSection.style.display = "none";
-    return;
-  }
+    role = doc.data().role;
+    roleText.textContent = "Role: " + role.toUpperCase();
 
-  role = doc.data().role;
-  roleText.textContent = "Role: " + role.toUpperCase();
+    if (role === "admin") {
+      await stopScanner();
+      adminPanel.style.display = "block";
+      scannerSection.style.display = "none";
+      loadMeals();
+      loadUsersRealtime();
+    }
 
-  if (role === "admin") {
-    await stopScanner();
-    adminPanel.style.display = "block";
-    scannerSection.style.display = "none";
-    loadMeals();
-  }
+    if (role === "volunteer") {
+      adminPanel.style.display = "none";
+      scannerSection.style.display = "block";
+      startScanner();
+    }
 
-  if (role === "volunteer") {
-    adminPanel.style.display = "none";
-    scannerSection.style.display = "block";
-    startScanner();
-  }
+    if (role === "disabled" || role === "pending") {
+      await stopScanner();
+      adminPanel.style.display = "none";
+      scannerSection.style.display = "none";
+    }
+  });
 });
 
 /* MEALS */
@@ -236,45 +206,69 @@ function loadMeals() {
     mealSelect.appendChild(o);
   });
 }
+function setMeal(m) { currentMeal = m; }
 
-function setMeal(m) {
-  currentMeal = m;
-  status.textContent = "Current meal: " + m.toUpperCase();
+/* USER MANAGEMENT */
+function loadUsersRealtime() {
+  db.collection("users").orderBy("createdAt").onSnapshot(snap => {
+    userList.innerHTML = "";
+    snap.forEach(doc => {
+      const u = doc.data();
+      userList.innerHTML += `
+        <li class="flex justify-between bg-white/5 p-2 rounded">
+          <div>
+            <p>${u.email}</p>
+            <p class="text-xs text-gray-400">${u.role}</p>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="updateRole('${doc.id}','volunteer')" class="px-2 bg-blue-600 rounded text-xs">Vol</button>
+            <button onclick="updateRole('${doc.id}','admin')" class="px-2 bg-red-600 rounded text-xs">Admin</button>
+            <button onclick="disableUser('${doc.id}')" class="px-2 bg-gray-700 rounded text-xs">Remove</button>
+          </div>
+        </li>`;
+    });
+  });
 }
 
-/* ROLE ASSIGNMENT */
-async function setRole(newRole) {
-  const emailVal = roleEmail.value.trim();
-  if (!emailVal) return alert("Enter email");
+/* ROLE UPDATE */
+async function updateRole(targetUid, newRole) {
+  if (role !== "admin") return;
+  if (targetUid === auth.currentUser.uid && newRole === "admin") {
+    alert("Self-promotion blocked");
+    return;
+  }
+  await db.collection("users").doc(targetUid).update({ role: newRole });
+  logAudit("ROLE_UPDATE", targetUid, newRole);
+}
 
-  const snap = await db.collection("users")
-    .where("email", "==", emailVal).get();
+async function disableUser(uid) {
+  if (!confirm("Disable user?")) return;
+  await db.collection("users").doc(uid).update({ role: "disabled" });
+  logAudit("USER_DISABLED", uid, "disabled");
+}
 
-  if (snap.empty) return alert("User not found");
-
-  snap.forEach(d => {
-    db.collection("users").doc(d.id).set({
-      email: emailVal,
-      role: newRole
-    }, { merge: true });
+/* AUDIT */
+async function logAudit(action, targetUid, newRole) {
+  await db.collection("audit_logs").add({
+    action,
+    targetUid,
+    newRole,
+    performedBy: auth.currentUser.uid,
+    performedByEmail: auth.currentUser.email,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
   });
-
-  alert("Role updated");
 }
 
 /* SCANNER */
 async function startScanner() {
   if (role !== "volunteer") return;
-
   scanner = new Html5Qrcode("reader");
   const cams = await Html5Qrcode.getCameras();
-
   await scanner.start(cams[0].id, { fps: 10, qrbox: 250 }, async text => {
     const id = text.trim().toUpperCase();
     const ref = db.collection("meal_records").doc(id);
     const snap = await ref.get();
-    let meals = snap.exists ? (snap.data().meals || {}) : {};
-
+    let meals = snap.exists ? snap.data().meals || {} : {};
     if (meals[currentMeal]?.date === today()) {
       message.textContent = "❌ Already Taken";
     } else {
@@ -294,34 +288,21 @@ async function stopScanner() {
 }
 
 /* REPORT */
-function openReport() {
-  reportModal.classList.remove("hidden");
-}
-
-function closeReport() {
-  reportModal.classList.add("hidden");
-}
+function openReport() { reportModal.classList.remove("hidden"); }
+function closeReport() { reportModal.classList.add("hidden"); }
 
 async function downloadReport(type) {
   closeReport();
   const snap = await db.collection("meal_records").get();
   const rows = [];
-
   snap.forEach(d => {
     const meals = d.data().meals || {};
     Object.keys(meals).forEach(k => {
       if (type === "today" && meals[k].date !== today()) return;
-      rows.push({
-        ID: d.id,
-        Meal: k.toUpperCase(),
-        Date: meals[k].date,
-        Time: meals[k].time
-      });
+      rows.push({ ID: d.id, Meal: k, Date: meals[k].date, Time: meals[k].time });
     });
   });
-
   if (!rows.length) return alert("No records");
-
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Report");
