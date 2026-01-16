@@ -1,134 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MealPass — Scan. Serve. Simplified.</title>
 
-<!-- FAVICON (put favicon.ico in same folder) -->
-<link rel="icon" type="image/x-icon" href="favicon.ico">
-
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-#reader { position: relative; overflow: hidden; }
-#reader video {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  border-radius: 12px;
+/* ---------- SPLASH ANIMATION ---------- */
+@keyframes logoIn {
+  0% { opacity: 0; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes fadeOut {
+  to { opacity: 0; visibility: hidden; }
+}
+.splash-logo {
+  animation: logoIn 0.8s ease-out forwards;
+}
+.splash-hide {
+  animation: fadeOut 0.6s ease-in forwards;
 }
 </style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white">
+<body class="bg-[#4b146b] text-white overflow-hidden">
 
-<!-- ================= LOGIN ================= -->
-<div id="loginScreen" class="fixed inset-0 flex items-center justify-center">
-  <div class="bg-white/10 backdrop-blur p-6 rounded-xl w-80 text-center">
-    <h1 class="text-2xl font-bold text-purple-400">MealPass</h1>
+<!-- ================= SPLASH SCREEN ================= -->
+<div id="splash"
+  class="fixed inset-0 flex flex-col items-center justify-center bg-[#4b146b] z-50">
+
+  <!-- LOGO (SVG EMBED) -->
+  <svg width="180" height="180" viewBox="0 0 512 512" class="splash-logo">
+    <rect width="512" height="512" rx="48" fill="#5b1a86"/>
+    <!-- Dome -->
+    <path d="M96 256h320c0-106-86-192-192-192S96 150 96 256z" fill="white"/>
+    <!-- Fork -->
+    <rect x="248" y="160" width="16" height="96" fill="#5b1a86"/>
+    <rect x="232" y="160" width="12" height="48" fill="#5b1a86"/>
+    <rect x="268" y="160" width="12" height="48" fill="#5b1a86"/>
+    <!-- Speed lines -->
+    <rect x="96" y="240" width="120" height="12" rx="6" fill="white"/>
+    <rect x="96" y="272" width="160" height="12" rx="6" fill="white"/>
+  </svg>
+
+  <h1 class="mt-6 text-4xl font-extrabold tracking-wider">
+    MEALPASS
+  </h1>
+  <p class="mt-2 text-sm tracking-widest opacity-80">
+    SCAN. SERVE. SIMPLIFIED.
+  </p>
+</div>
+
+<!-- ================= APP CONTENT ================= -->
+<div id="app" class="hidden min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] p-4">
+
+  <!-- LOGIN PLACEHOLDER -->
+  <div class="max-w-sm mx-auto mt-20 bg-white/10 p-6 rounded-xl text-center">
+    <h2 class="text-2xl font-bold text-purple-300">MealPass</h2>
     <p class="text-sm text-gray-300 mb-4">Scan. Serve. Simplified.</p>
 
-    <input id="loginEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
-    <input id="loginPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
+    <input class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
+    <input type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
 
-    <button onclick="login()" class="w-full py-2 bg-purple-600 rounded font-semibold">
+    <button class="w-full py-2 bg-purple-600 rounded font-semibold">
       Login
     </button>
   </div>
-</div>
 
-<!-- ================= APP ================= -->
-<div id="app" class="hidden p-4 max-w-5xl mx-auto space-y-6">
-
-<header class="text-center">
-  <h2 class="text-3xl font-bold text-purple-400">MealPass</h2>
-  <p class="text-sm text-gray-300">Scan. Serve. Simplified.</p>
-  <p id="roleText" class="text-xs mt-1"></p>
-</header>
-
-<!-- ================= ADMIN PANEL ================= -->
-<div id="adminPanel" class="hidden space-y-4">
-
-<div class="bg-white/10 p-4 rounded-xl">
-  <h3 class="font-bold mb-2">Upload Allowed IDs (Excel)</h3>
-  <input type="file" id="excelFile" accept=".xlsx,.xls">
-  <p id="excelCount" class="text-green-400 text-sm mt-2"></p>
-</div>
-
-<select id="mealSelect" class="w-full p-2 rounded bg-black"></select>
-
-<div class="bg-white/10 p-4 rounded-xl">
-  <h3 class="font-bold mb-2">User Management</h3>
-  <ul id="userList" class="space-y-2 text-sm"></ul>
-</div>
-
-<button onclick="openReport()" class="w-full py-2 bg-green-600 rounded font-semibold">
-Download Report
-</button>
-
-</div>
-
-<!-- ================= VOLUNTEER PANEL ================= -->
-<div id="volunteerPanel" class="hidden space-y-4">
-
-<div class="flex gap-2">
-  <button id="startBtn" onclick="startScanner()" class="flex-1 py-2 bg-green-600 rounded font-semibold">
-    Start Scan
-  </button>
-  <button id="stopBtn" onclick="stopScanner()" disabled class="flex-1 py-2 bg-red-600 rounded font-semibold">
-    Stop
-  </button>
-</div>
-
-<div class="bg-black p-2 rounded-xl">
-  <div id="reader" class="h-[300px] flex items-center justify-center text-gray-400">
-    Camera stopped
-  </div>
-</div>
-
-</div>
-
-<button onclick="logout()" class="block mx-auto underline text-sm">Logout</button>
-
-<footer class="text-center text-xs text-gray-400 mt-6">
-© 2026 MealPass. All rights reserved.
-</footer>
-
-</div>
-
-<!-- ================= SCAN RESULT MODAL ================= -->
-<div id="scanModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
-  <div class="bg-white text-black p-6 rounded-xl w-64 text-center space-y-3">
-    <p id="scanText" class="font-bold text-lg"></p>
-    <button onclick="closeScanModal()" class="w-full py-2 bg-purple-600 text-white rounded font-semibold">
-      OK, Continue
-    </button>
-  </div>
-</div>
-
-<!-- ================= REPORT MODAL ================= -->
-<div id="reportModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
-  <div class="bg-white text-black p-5 rounded w-64 text-center space-y-2">
-    <button onclick="downloadReport('today')" class="w-full py-2 bg-purple-600 text-white rounded">
-      Today Report
-    </button>
-    <button onclick="downloadReport('all')" class="w-full py-2 bg-gray-800 text-white rounded">
-      All Records
-    </button>
-    <button onclick="closeReport()" class="underline text-sm">Cancel</button>
-  </div>
+  <footer class="text-center text-xs text-gray-400 mt-10">
+    © 2026 MealPass. All rights reserved.
+  </footer>
 </div>
 
 <script>
+/* ---------- SPLASH TIMING ---------- */
+setTimeout(() => {
+  document.getElementById("splash").classList.add("splash-hide");
+  document.getElementById("app").classList.remove("hidden");
+  document.body.classList.remove("overflow-hidden");
+}, 2000);
+
 /* ---------- FIREBASE ---------- */
 firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
