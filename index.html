@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORC Smart Meal System</title>
+
+<title>MealPass — Scan. Serve. Simplified.</title>
+
+<!-- FAVICON (put favicon.ico in same folder) -->
+<link rel="icon" type="image/x-icon" href="favicon.ico">
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -27,42 +31,47 @@
 
 <body class="min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] text-white">
 
-<!-- LOGIN -->
+<!-- ================= LOGIN ================= -->
 <div id="loginScreen" class="fixed inset-0 flex items-center justify-center">
-  <div class="bg-white/10 p-6 rounded-xl w-80">
-    <h2 class="text-xl font-bold text-center mb-4">Login</h2>
+  <div class="bg-white/10 backdrop-blur p-6 rounded-xl w-80 text-center">
+    <h1 class="text-2xl font-bold text-purple-400">MealPass</h1>
+    <p class="text-sm text-gray-300 mb-4">Scan. Serve. Simplified.</p>
+
     <input id="loginEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
     <input id="loginPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
-    <button onclick="login()" class="w-full py-2 bg-purple-600 rounded">Login</button>
+
+    <button onclick="login()" class="w-full py-2 bg-purple-600 rounded font-semibold">
+      Login
+    </button>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ================= APP ================= -->
 <div id="app" class="hidden p-4 max-w-5xl mx-auto space-y-6">
 
-<h2 class="text-center text-2xl font-bold text-purple-400">ORC Smart Meal System</h2>
-<p id="roleText" class="text-center text-sm"></p>
+<header class="text-center">
+  <h2 class="text-3xl font-bold text-purple-400">MealPass</h2>
+  <p class="text-sm text-gray-300">Scan. Serve. Simplified.</p>
+  <p id="roleText" class="text-xs mt-1"></p>
+</header>
 
 <!-- ================= ADMIN PANEL ================= -->
 <div id="adminPanel" class="hidden space-y-4">
 
-<!-- Excel Upload -->
-<div class="bg-white/10 p-4 rounded-xl space-y-2">
-  <h3 class="font-bold">Upload Excel (Allowed IDs)</h3>
+<div class="bg-white/10 p-4 rounded-xl">
+  <h3 class="font-bold mb-2">Upload Allowed IDs (Excel)</h3>
   <input type="file" id="excelFile" accept=".xlsx,.xls">
-  <p id="excelCount" class="text-green-400 text-sm"></p>
+  <p id="excelCount" class="text-green-400 text-sm mt-2"></p>
 </div>
 
-<!-- Meal Select -->
 <select id="mealSelect" class="w-full p-2 rounded bg-black"></select>
 
-<!-- User Management -->
 <div class="bg-white/10 p-4 rounded-xl">
   <h3 class="font-bold mb-2">User Management</h3>
   <ul id="userList" class="space-y-2 text-sm"></ul>
 </div>
 
-<button onclick="openReport()" class="w-full py-2 bg-green-600 rounded">
+<button onclick="openReport()" class="w-full py-2 bg-green-600 rounded font-semibold">
 Download Report
 </button>
 
@@ -72,10 +81,10 @@ Download Report
 <div id="volunteerPanel" class="hidden space-y-4">
 
 <div class="flex gap-2">
-  <button id="startBtn" onclick="startScanner()" class="flex-1 py-2 bg-green-600 rounded">
+  <button id="startBtn" onclick="startScanner()" class="flex-1 py-2 bg-green-600 rounded font-semibold">
     Start Scan
   </button>
-  <button id="stopBtn" onclick="stopScanner()" disabled class="flex-1 py-2 bg-red-600 rounded">
+  <button id="stopBtn" onclick="stopScanner()" disabled class="flex-1 py-2 bg-red-600 rounded font-semibold">
     Stop
   </button>
 </div>
@@ -89,19 +98,24 @@ Download Report
 </div>
 
 <button onclick="logout()" class="block mx-auto underline text-sm">Logout</button>
+
+<footer class="text-center text-xs text-gray-400 mt-6">
+© 2026 MealPass. All rights reserved.
+</footer>
+
 </div>
 
-<!-- SCAN RESULT MODAL -->
+<!-- ================= SCAN RESULT MODAL ================= -->
 <div id="scanModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
   <div class="bg-white text-black p-6 rounded-xl w-64 text-center space-y-3">
-    <p id="scanText" class="font-bold"></p>
-    <button onclick="closeScanModal()" class="w-full py-2 bg-purple-600 text-white rounded">
-      OK
+    <p id="scanText" class="font-bold text-lg"></p>
+    <button onclick="closeScanModal()" class="w-full py-2 bg-purple-600 text-white rounded font-semibold">
+      OK, Continue
     </button>
   </div>
 </div>
 
-<!-- REPORT MODAL -->
+<!-- ================= REPORT MODAL ================= -->
 <div id="reportModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
   <div class="bg-white text-black p-5 rounded w-64 text-center space-y-2">
     <button onclick="downloadReport('today')" class="w-full py-2 bg-purple-600 text-white rounded">
@@ -290,5 +304,7 @@ async function downloadReport(type){
   XLSX.writeFile(wb,`meal_report_${type}.xlsx`);
 }
 </script>
+</script>
+
 </body>
 </html>
