@@ -7,82 +7,154 @@
 
 <script src="https://cdn.tailwindcss.com"></script>
 
+<!-- Firebase v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<!-- QR + Excel -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <style>
-/* ---------- SPLASH ANIMATION ---------- */
-@keyframes logoIn {
-  0% { opacity: 0; transform: scale(0.85); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes fadeOut {
-  to { opacity: 0; visibility: hidden; }
-}
-.splash-logo {
-  animation: logoIn 0.8s ease-out forwards;
-}
-.splash-hide {
-  animation: fadeOut 0.6s ease-in forwards;
+@keyframes logoIn { from {opacity:0;transform:scale(.9)} to {opacity:1;transform:scale(1)} }
+@keyframes fadeOut { to {opacity:0;visibility:hidden} }
+
+.splash-logo { animation: logoIn .8s ease-out forwards; }
+.splash-hide { animation: fadeOut .6s ease-in forwards; }
+
+#reader { position:relative; overflow:hidden; }
+#reader video {
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  border-radius:12px;
 }
 </style>
 </head>
 
 <body class="bg-[#4b146b] text-white overflow-hidden">
 
-<!-- ================= SPLASH SCREEN ================= -->
-<div id="splash"
-  class="fixed inset-0 flex flex-col items-center justify-center bg-[#4b146b] z-50">
-
-  <!-- LOGO (SVG EMBED) -->
+<!-- ================= SPLASH ================= -->
+<div id="splash" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#4b146b]">
   <svg width="180" height="180" viewBox="0 0 512 512" class="splash-logo">
     <rect width="512" height="512" rx="48" fill="#5b1a86"/>
-    <!-- Dome -->
     <path d="M96 256h320c0-106-86-192-192-192S96 150 96 256z" fill="white"/>
-    <!-- Fork -->
-    <rect x="248" y="160" width="16" height="96" fill="#5b1a86"/>
-    <rect x="232" y="160" width="12" height="48" fill="#5b1a86"/>
-    <rect x="268" y="160" width="12" height="48" fill="#5b1a86"/>
-    <!-- Speed lines -->
-    <rect x="96" y="240" width="120" height="12" rx="6" fill="white"/>
-    <rect x="96" y="272" width="160" height="12" rx="6" fill="white"/>
   </svg>
-
-  <h1 class="mt-6 text-4xl font-extrabold tracking-wider">
-    MEALPASS
-  </h1>
-  <p class="mt-2 text-sm tracking-widest opacity-80">
-    SCAN. SERVE. SIMPLIFIED.
-  </p>
+  <h1 class="mt-6 text-4xl font-extrabold">MEALPASS</h1>
+  <p class="mt-2 text-sm tracking-widest opacity-80">SCAN. SERVE. SIMPLIFIED.</p>
 </div>
 
-<!-- ================= APP CONTENT ================= -->
+<!-- ================= APP ================= -->
 <div id="app" class="hidden min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] p-4">
 
-  <!-- LOGIN PLACEHOLDER -->
-  <div class="max-w-sm mx-auto mt-20 bg-white/10 p-6 rounded-xl text-center">
-    <h2 class="text-2xl font-bold text-purple-300">MealPass</h2>
-    <p class="text-sm text-gray-300 mb-4">Scan. Serve. Simplified.</p>
+<!-- AUTH -->
+<div id="authBox" class="max-w-sm mx-auto mt-20 bg-white/10 p-6 rounded-xl text-center">
+  <h2 class="text-2xl font-bold text-purple-300 mb-2">MealPass</h2>
 
-    <input class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
-    <input type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
-
-    <button class="w-full py-2 bg-purple-600 rounded font-semibold">
-      Login
-    </button>
+  <!-- LOGIN -->
+  <div id="loginBox">
+    <input id="loginEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
+    <input id="loginPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
+    <button onclick="login()" class="w-full py-2 bg-purple-600 rounded font-semibold">Login</button>
+    <p class="text-sm mt-3">No account?
+      <span class="underline cursor-pointer" onclick="showSignup()">Sign up</span>
+    </p>
   </div>
 
-  <footer class="text-center text-xs text-gray-400 mt-10">
-    © 2026 MealPass. All rights reserved.
-  </footer>
+  <!-- SIGNUP -->
+  <div id="signupBox" class="hidden">
+    <input id="signupEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
+    <input id="signupPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
+    <button onclick="signup()" class="w-full py-2 bg-green-600 rounded font-semibold">Create Account</button>
+    <p class="text-sm mt-3">
+      <span class="underline cursor-pointer" onclick="showLogin()">Back to login</span>
+    </p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden max-w-5xl mx-auto space-y-6">
+
+<header class="text-center">
+  <h2 class="text-3xl font-bold text-purple-400">MealPass</h2>
+  <p class="text-sm text-gray-300">Scan. Serve. Simplified.</p>
+  <p id="roleText" class="text-xs mt-1"></p>
+</header>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden space-y-4">
+
+<div class="bg-white/10 p-4 rounded-xl">
+  <h3 class="font-bold mb-2">Upload Allowed IDs (Excel)</h3>
+  <input type="file" id="excelFile" accept=".xlsx,.xls">
+  <p id="excelCount" class="text-green-400 text-sm mt-2"></p>
+</div>
+
+<select id="mealSelect" class="w-full p-2 rounded bg-black"></select>
+
+<div class="bg-white/10 p-4 rounded-xl">
+  <h3 class="font-bold mb-2">User Management</h3>
+  <ul id="userList" class="space-y-2 text-sm"></ul>
+</div>
+
+<button onclick="openReport()" class="w-full py-2 bg-green-600 rounded font-semibold">
+Download Report
+</button>
+</div>
+
+<!-- VOLUNTEER PANEL -->
+<div id="volunteerPanel" class="hidden space-y-4">
+
+<div class="flex gap-2">
+  <button id="startBtn" onclick="startScanner()" class="flex-1 py-2 bg-green-600 rounded">Start Scan</button>
+  <button id="stopBtn" onclick="stopScanner()" disabled class="flex-1 py-2 bg-red-600 rounded">Stop</button>
+</div>
+
+<div class="bg-black p-2 rounded-xl">
+  <div id="reader" class="h-[300px] flex items-center justify-center text-gray-400">
+    Camera stopped
+  </div>
+</div>
+</div>
+
+<button onclick="logout()" class="block mx-auto underline text-sm">Logout</button>
+
+<footer class="text-center text-xs text-gray-400 mt-6">
+© 2026 MealPass. All rights reserved.
+</footer>
+
+</div>
+</div>
+
+<!-- SCAN MODAL -->
+<div id="scanModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+  <div class="bg-white text-black p-6 rounded-xl w-64 text-center space-y-3">
+    <p id="scanText" class="font-bold text-lg"></p>
+    <button onclick="closeScanModal()" class="w-full py-2 bg-purple-600 text-white rounded">OK</button>
+  </div>
+</div>
+
+<!-- REPORT MODAL -->
+<div id="reportModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+  <div class="bg-white text-black p-5 rounded w-64 text-center space-y-2">
+    <button onclick="downloadReport('today')" class="w-full py-2 bg-purple-600 text-white rounded">Today</button>
+    <button onclick="downloadReport('all')" class="w-full py-2 bg-gray-800 text-white rounded">All</button>
+    <button onclick="closeReport()" class="underline text-sm">Cancel</button>
+  </div>
 </div>
 
 <script>
-/* ---------- SPLASH TIMING ---------- */
+/* SPLASH */
 setTimeout(() => {
-  document.getElementById("splash").classList.add("splash-hide");
-  document.getElementById("app").classList.remove("hidden");
+  splash.classList.add("splash-hide");
+  app.classList.remove("hidden");
   document.body.classList.remove("overflow-hidden");
-}, 2000);
+}, 1800);
 
-/* ---------- FIREBASE ---------- */
+/* FIREBASE */
 firebase.initializeApp({
   apiKey: "AIzaSyDlgdYJ9-3ELhEjLz8EQJQK18ghlWhR-jo",
   authDomain: "orc-meal-tracker.firebaseapp.com",
@@ -91,12 +163,9 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ---------- CONFIG ---------- */
-const MEALS = ["breakfast","lunch","dinner"];
-let currentMeal = "breakfast";
-let scanner = null;
-
-/* ---------- INIT MEALS ---------- */
+/* MEALS */
+const MEALS=["breakfast","lunch","dinner"];
+let currentMeal="breakfast";
 MEALS.forEach(m=>{
   const o=document.createElement("option");
   o.value=m; o.textContent=m;
@@ -104,160 +173,144 @@ MEALS.forEach(m=>{
 });
 mealSelect.onchange=e=>currentMeal=e.target.value;
 
-/* ---------- AUTH ---------- */
-function login(){
-  auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value);
-}
-function logout(){
-  stopScanner();
-  auth.signOut();
-}
+/* AUTH UI */
+function showSignup(){ loginBox.classList.add("hidden"); signupBox.classList.remove("hidden"); }
+function showLogin(){ signupBox.classList.add("hidden"); loginBox.classList.remove("hidden"); }
 
-/* ---------- ROLE HANDLER ---------- */
-auth.onAuthStateChanged(user=>{
-  if(!user){
-    loginScreen.style.display="flex";
-    app.classList.add("hidden");
+/* AUTH */
+function login(){
+  auth.signInWithEmailAndPassword(loginEmail.value,loginPassword.value)
+    .catch(e=>alert(e.message));
+}
+function signup(){
+  auth.createUserWithEmailAndPassword(signupEmail.value,signupPassword.value)
+    .then(c=>db.collection("users").doc(c.user.uid).set({
+      email:c.user.email, role:"pending", createdAt:new Date()
+    }))
+    .then(()=>{ alert("Waiting for admin approval"); showLogin(); })
+    .catch(e=>alert(e.message));
+}
+function logout(){ stopScanner(); auth.signOut(); }
+
+/* AUTH STATE */
+auth.onAuthStateChanged(u=>{
+  if(!u){
+    authBox.classList.remove("hidden");
+    dashboard.classList.add("hidden");
     return;
   }
-  loginScreen.style.display="none";
-  app.classList.remove("hidden");
+  authBox.classList.add("hidden");
+  dashboard.classList.remove("hidden");
 
-  db.collection("users").doc(user.uid).onSnapshot(doc=>{
-    const role = doc.data().role;
-    roleText.textContent = "Role: " + role;
-
-    adminPanel.style.display = role==="admin" ? "block" : "none";
-    volunteerPanel.style.display = role==="volunteer" ? "block" : "none";
-
+  db.collection("users").doc(u.uid).onSnapshot(d=>{
+    const role=d.data().role;
+    roleText.textContent="Role: "+role;
+    adminPanel.style.display=role==="admin"?"block":"none";
+    volunteerPanel.style.display=role==="volunteer"?"block":"none";
     if(role==="admin") loadUsers();
   });
 });
 
-/* ---------- USER MANAGEMENT ---------- */
+/* USER MGMT */
 function loadUsers(){
-  db.collection("users").orderBy("createdAt").onSnapshot(snap=>{
+  db.collection("users").orderBy("createdAt").onSnapshot(s=>{
     userList.innerHTML="";
-    snap.forEach(doc=>{
-      const u = doc.data();
-      userList.innerHTML += `
-<li class="bg-black/30 p-3 rounded flex flex-col sm:flex-row justify-between gap-2">
-  <div>
-    <p>${u.email}</p>
-    <p class="text-xs text-gray-400">${u.role}</p>
-  </div>
-  <div class="flex gap-2 flex-wrap">
-    <button onclick="setRole('${doc.id}','volunteer')" class="px-3 py-1 bg-blue-600 text-xs rounded">Volunteer</button>
-    <button onclick="setRole('${doc.id}','admin')" class="px-3 py-1 bg-red-600 text-xs rounded">Admin</button>
-    <button onclick="setRole('${doc.id}','disabled')" class="px-3 py-1 bg-gray-700 text-xs rounded">Disable</button>
-  </div>
-</li>`;
+    s.forEach(d=>{
+      const u=d.data();
+      userList.innerHTML+=`
+<li class="bg-black/30 p-3 rounded flex justify-between gap-2">
+<div>${u.email}<br><span class="text-xs text-gray-400">${u.role}</span></div>
+<div class="flex gap-1">
+<button onclick="setRole('${d.id}','volunteer')" class="px-2 bg-blue-600 rounded text-xs">Vol</button>
+<button onclick="setRole('${d.id}','admin')" class="px-2 bg-red-600 rounded text-xs">Admin</button>
+<button onclick="setRole('${d.id}','disabled')" class="px-2 bg-gray-700 rounded text-xs">Off</button>
+</div></li>`;
     });
   });
 }
-function setRole(uid, role){
-  if(uid === auth.currentUser.uid && role === "admin"){
-    alert("Self promotion blocked");
-    return;
-  }
-  db.collection("users").doc(uid).update({ role });
+function setRole(uid,role){
+  if(uid===auth.currentUser.uid && role==="admin"){alert("Blocked");return;}
+  db.collection("users").doc(uid).update({role});
 }
 
-/* ---------- EXCEL UPLOAD ---------- */
-excelFile.onchange = async e => {
-  const file = e.target.files[0];
-  const r = new FileReader();
-  r.onload = async ev => {
-    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    const col = Object.keys(rows[0])[0];
+/* EXCEL */
+excelFile.onchange=async e=>{
+  const r=new FileReader();
+  r.onload=async ev=>{
+    const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    const col=Object.keys(rows[0])[0];
 
-    const old = await db.collection("allowed_ids").get();
-    const batch = db.batch();
-    old.forEach(d=>batch.delete(d.ref));
-    await batch.commit();
+    const old=await db.collection("allowed_ids").get();
+    const b=db.batch(); old.forEach(d=>b.delete(d.ref)); await b.commit();
 
-    let count=0;
+    let c=0;
     for(const row of rows){
-      const id = String(row[col]).trim().toUpperCase();
-      if(!id) continue;
-      await db.collection("allowed_ids").doc(id).set({active:true});
-      count++;
+      const id=String(row[col]).trim().toUpperCase();
+      if(id){ await db.collection("allowed_ids").doc(id).set({active:true}); c++; }
     }
-    excelCount.textContent = `${count} IDs uploaded`;
+    excelCount.textContent=`${c} IDs uploaded`;
   };
-  r.readAsArrayBuffer(file);
+  r.readAsArrayBuffer(e.target.files[0]);
 };
 
-/* ---------- SCANNER ---------- */
+/* SCANNER */
+let scanner=null;
 async function startScanner(){
-  if(scanner) return;
+  if(scanner)return;
   startBtn.disabled=true; stopBtn.disabled=false;
-  scanner = new Html5Qrcode("reader");
+  scanner=new Html5Qrcode("reader");
   await scanner.start({facingMode:"environment"},{fps:10,qrbox:250},onScan);
 }
 async function stopScanner(){
-  if(!scanner) return;
+  if(!scanner)return;
   await scanner.stop(); await scanner.clear();
-  scanner=null;
-  reader.textContent="Camera stopped";
+  scanner=null; reader.textContent="Camera stopped";
   startBtn.disabled=false; stopBtn.disabled=true;
 }
-
-/* ---------- SCAN HANDLER ---------- */
 async function onScan(text){
   await stopScanner();
-  const id = text.trim().toUpperCase();
+  const id=text.trim().toUpperCase();
+  const ok=await db.collection("allowed_ids").doc(id).get();
+  if(!ok.exists){ showScan("Invalid ID"); return; }
 
-  const allowed = await db.collection("allowed_ids").doc(id).get();
-  if(!allowed.exists){ showScan("Invalid ID"); return; }
+  const ref=db.collection("meal_records").doc(id);
+  const snap=await ref.get();
+  const today=new Date().toISOString().split("T")[0];
+  let meals=snap.exists?snap.data().meals||{}:{};
 
-  const ref = db.collection("meal_records").doc(id);
-  const snap = await ref.get();
-  const today = new Date().toISOString().split("T")[0];
-  let meals = snap.exists ? snap.data().meals || {} : {};
-
-  if(meals[currentMeal]?.date === today){
+  if(meals[currentMeal]?.date===today){
     showScan("Already Taken");
-  } else {
-    meals[currentMeal] = { date: today, time: new Date().toLocaleTimeString() };
-    await ref.set({ id, meals }, { merge:true });
+  }else{
+    meals[currentMeal]={date:today,time:new Date().toLocaleTimeString()};
+    await ref.set({id,meals},{merge:true});
     showScan("Allowed");
   }
 }
 
-/* ---------- SCAN MODAL ---------- */
-function showScan(text){
-  scanText.textContent=text;
-  scanModal.classList.remove("hidden");
-}
-function closeScanModal(){
-  scanModal.classList.add("hidden");
-  startScanner();
-}
+/* MODALS */
+function showScan(t){ scanText.textContent=t; scanModal.classList.remove("hidden"); }
+function closeScanModal(){ scanModal.classList.add("hidden"); startScanner(); }
 
-/* ---------- REPORT ---------- */
 function openReport(){ reportModal.classList.remove("hidden"); }
 function closeReport(){ reportModal.classList.add("hidden"); }
 async function downloadReport(type){
   closeReport();
-  const snap = await db.collection("meal_records").get();
+  const s=await db.collection("meal_records").get();
   const rows=[];
-  snap.forEach(d=>{
+  s.forEach(d=>{
     const m=d.data().meals||{};
     Object.keys(m).forEach(k=>{
-      if(type==="today" && m[k].date!==new Date().toISOString().split("T")[0]) return;
+      if(type==="today" && m[k].date!==new Date().toISOString().split("T")[0])return;
       rows.push({ID:d.id,Meal:k,Date:m[k].date,Time:m[k].time});
     });
   });
-  if(!rows.length) return alert("No data");
+  if(!rows.length){alert("No data");return;}
   const ws=XLSX.utils.json_to_sheet(rows);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Report");
   XLSX.writeFile(wb,`meal_report_${type}.xlsx`);
 }
 </script>
-</script>
-
 </body>
 </html>
