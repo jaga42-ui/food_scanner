@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MealPass — Scan. Serve. Simplified.</title>
 
+<link rel="icon" href="favicon.ico" />
 <script src="https://cdn.tailwindcss.com"></script>
 
 <!-- Firebase v8 -->
@@ -20,12 +20,10 @@
 <style>
 @keyframes logoIn { from {opacity:0;transform:scale(.9)} to {opacity:1;transform:scale(1)} }
 @keyframes fadeOut { to {opacity:0;visibility:hidden} }
-
 .splash-logo { animation: logoIn .8s ease-out forwards; }
 .splash-hide { animation: fadeOut .6s ease-in forwards; }
 
-#reader { position:relative; overflow:hidden; }
-#reader video {
+#reader video{
   position:absolute!important;
   inset:0!important;
   width:100%!important;
@@ -38,7 +36,7 @@
 
 <body class="bg-[#4b146b] text-white overflow-hidden">
 
-<!-- ================= SPLASH ================= -->
+<!-- SPLASH -->
 <div id="splash" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#4b146b]">
   <svg width="180" height="180" viewBox="0 0 512 512" class="splash-logo">
     <rect width="512" height="512" rx="48" fill="#5b1a86"/>
@@ -48,14 +46,13 @@
   <p class="mt-2 text-sm tracking-widest opacity-80">SCAN. SERVE. SIMPLIFIED.</p>
 </div>
 
-<!-- ================= APP ================= -->
+<!-- APP -->
 <div id="app" class="hidden min-h-screen bg-gradient-to-b from-[#1f1b2e] to-[#36284a] p-4">
 
 <!-- AUTH -->
 <div id="authBox" class="max-w-sm mx-auto mt-20 bg-white/10 p-6 rounded-xl text-center">
   <h2 class="text-2xl font-bold text-purple-300 mb-2">MealPass</h2>
 
-  <!-- LOGIN -->
   <div id="loginBox">
     <input id="loginEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
     <input id="loginPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
@@ -65,14 +62,11 @@
     </p>
   </div>
 
-  <!-- SIGNUP -->
   <div id="signupBox" class="hidden">
     <input id="signupEmail" class="w-full p-2 mb-2 rounded text-black" placeholder="Email">
     <input id="signupPassword" type="password" class="w-full p-2 mb-3 rounded text-black" placeholder="Password">
     <button onclick="signup()" class="w-full py-2 bg-green-600 rounded font-semibold">Create Account</button>
-    <p class="text-sm mt-3">
-      <span class="underline cursor-pointer" onclick="showLogin()">Back to login</span>
-    </p>
+    <p class="text-sm mt-3 underline cursor-pointer" onclick="showLogin()">Back to login</p>
   </div>
 </div>
 
@@ -85,7 +79,7 @@
   <p id="roleText" class="text-xs mt-1"></p>
 </header>
 
-<!-- ADMIN PANEL -->
+<!-- ADMIN -->
 <div id="adminPanel" class="hidden space-y-4">
 
 <div class="bg-white/10 p-4 rounded-xl">
@@ -106,16 +100,15 @@ Download Report
 </button>
 </div>
 
-<!-- VOLUNTEER PANEL -->
+<!-- VOLUNTEER -->
 <div id="volunteerPanel" class="hidden space-y-4">
-
 <div class="flex gap-2">
   <button id="startBtn" onclick="startScanner()" class="flex-1 py-2 bg-green-600 rounded">Start Scan</button>
   <button id="stopBtn" onclick="stopScanner()" disabled class="flex-1 py-2 bg-red-600 rounded">Stop</button>
 </div>
 
-<div class="bg-black p-2 rounded-xl">
-  <div id="reader" class="h-[300px] flex items-center justify-center text-gray-400">
+<div class="bg-black p-2 rounded-xl relative h-[300px]">
+  <div id="reader" class="absolute inset-0 flex items-center justify-center text-gray-400">
     Camera stopped
   </div>
 </div>
@@ -126,11 +119,10 @@ Download Report
 <footer class="text-center text-xs text-gray-400 mt-6">
 © 2026 MealPass. All rights reserved.
 </footer>
-
 </div>
 </div>
 
-<!-- SCAN MODAL -->
+<!-- MODALS -->
 <div id="scanModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
   <div class="bg-white text-black p-6 rounded-xl w-64 text-center space-y-3">
     <p id="scanText" class="font-bold text-lg"></p>
@@ -138,7 +130,6 @@ Download Report
   </div>
 </div>
 
-<!-- REPORT MODAL -->
 <div id="reportModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
   <div class="bg-white text-black p-5 rounded w-64 text-center space-y-2">
     <button onclick="downloadReport('today')" class="w-full py-2 bg-purple-600 text-white rounded">Today</button>
@@ -148,6 +139,10 @@ Download Report
 </div>
 
 <script>
+/* UTIL */
+const todayIST = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
 /* SPLASH */
 setTimeout(() => {
   splash.classList.add("splash-hide");
@@ -165,14 +160,15 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* MEALS */
-const MEALS=["breakfast","lunch","dinner"];
-let currentMeal="breakfast";
-MEALS.forEach(m=>{
-  const o=document.createElement("option");
-  o.value=m; o.textContent=m;
+const MEALS = ["breakfast", "lunch", "dinner"];
+let currentMeal = "breakfast";
+MEALS.forEach(m => {
+  const o = document.createElement("option");
+  o.value = m;
+  o.textContent = m;
   mealSelect.appendChild(o);
 });
-mealSelect.onchange=e=>currentMeal=e.target.value;
+mealSelect.onchange = e => currentMeal = e.target.value;
 
 /* AUTH UI */
 function showSignup(){ loginBox.classList.add("hidden"); signupBox.classList.remove("hidden"); }
@@ -180,22 +176,24 @@ function showLogin(){ signupBox.classList.add("hidden"); loginBox.classList.remo
 
 /* AUTH */
 function login(){
-  auth.signInWithEmailAndPassword(loginEmail.value,loginPassword.value)
-    .catch(e=>alert(e.message));
+  auth.signInWithEmailAndPassword(loginEmail.value, loginPassword.value)
+    .catch(e => alert(e.message));
 }
 function signup(){
-  auth.createUserWithEmailAndPassword(signupEmail.value,signupPassword.value)
-    .then(c=>db.collection("users").doc(c.user.uid).set({
-      email:c.user.email, role:"pending", createdAt:new Date()
+  auth.createUserWithEmailAndPassword(signupEmail.value, signupPassword.value)
+    .then(c => db.collection("users").doc(c.user.uid).set({
+      email: c.user.email,
+      role: "pending",
+      createdAt: new Date()
     }))
-    .then(()=>{ alert("Waiting for admin approval"); showLogin(); })
-    .catch(e=>alert(e.message));
+    .then(() => { alert("Waiting for admin approval"); showLogin(); })
+    .catch(e => alert(e.message));
 }
 function logout(){ stopScanner(); auth.signOut(); }
 
 /* AUTH STATE */
-auth.onAuthStateChanged(u=>{
-  if(!u){
+auth.onAuthStateChanged(u => {
+  if (!u) {
     authBox.classList.remove("hidden");
     dashboard.classList.add("hidden");
     return;
@@ -203,22 +201,22 @@ auth.onAuthStateChanged(u=>{
   authBox.classList.add("hidden");
   dashboard.classList.remove("hidden");
 
-  db.collection("users").doc(u.uid).onSnapshot(d=>{
-    const role=d.data().role;
-    roleText.textContent="Role: "+role;
-    adminPanel.style.display=role==="admin"?"block":"none";
-    volunteerPanel.style.display=role==="volunteer"?"block":"none";
-    if(role==="admin") loadUsers();
+  db.collection("users").doc(u.uid).onSnapshot(d => {
+    const role = d.data().role;
+    roleText.textContent = "Role: " + role;
+    adminPanel.style.display = role === "admin" ? "block" : "none";
+    volunteerPanel.style.display = role === "volunteer" ? "block" : "none";
+    if (role === "admin") loadUsers();
   });
 });
 
-/* USER MGMT */
+/* USERS */
 function loadUsers(){
-  db.collection("users").orderBy("createdAt").onSnapshot(s=>{
-    userList.innerHTML="";
-    s.forEach(d=>{
-      const u=d.data();
-      userList.innerHTML+=`
+  db.collection("users").orderBy("createdAt").onSnapshot(s => {
+    userList.innerHTML = "";
+    s.forEach(d => {
+      const u = d.data();
+      userList.innerHTML += `
 <li class="bg-black/30 p-3 rounded flex justify-between gap-2">
 <div>${u.email}<br><span class="text-xs text-gray-400">${u.role}</span></div>
 <div class="flex gap-1">
@@ -229,90 +227,116 @@ function loadUsers(){
     });
   });
 }
-function setRole(uid,role){
-  if(uid===auth.currentUser.uid && role==="admin"){alert("Blocked");return;}
-  db.collection("users").doc(uid).update({role});
+function setRole(uid, role){
+  if (uid === auth.currentUser.uid && role === "admin") {
+    alert("Blocked"); return;
+  }
+  db.collection("users").doc(uid).update({ role });
 }
 
 /* EXCEL */
-excelFile.onchange=async e=>{
-  const r=new FileReader();
-  r.onload=async ev=>{
-    const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array"});
-    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    const col=Object.keys(rows[0])[0];
+excelFile.onchange = e => {
+  const r = new FileReader();
+  r.onload = async ev => {
+    const wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    const col = Object.keys(rows[0])[0];
 
-    const old=await db.collection("allowed_ids").get();
-    const b=db.batch(); old.forEach(d=>b.delete(d.ref)); await b.commit();
+    const old = await db.collection("allowed_ids").get();
+    const b = db.batch();
+    old.forEach(d => b.delete(d.ref));
+    await b.commit();
 
-    let c=0;
-    for(const row of rows){
-      const id=String(row[col]).trim().toUpperCase();
-      if(id){ await db.collection("allowed_ids").doc(id).set({active:true}); c++; }
+    let c = 0;
+    for (const row of rows) {
+      const id = String(row[col]).trim().toUpperCase();
+      if (id) {
+        await db.collection("allowed_ids").doc(id).set({ active: true });
+        c++;
+      }
     }
-    excelCount.textContent=`${c} IDs uploaded`;
+    excelCount.textContent = `${c} IDs uploaded`;
   };
   r.readAsArrayBuffer(e.target.files[0]);
 };
 
 /* SCANNER */
-let scanner=null;
+let scanner = null;
+let scanLock = false;
+
 async function startScanner(){
-  if(scanner)return;
-  startBtn.disabled=true; stopBtn.disabled=false;
-  scanner=new Html5Qrcode("reader");
-  await scanner.start({facingMode:"environment"},{fps:10,qrbox:250},onScan);
+  if (scanner || scanLock) return;
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  scanner = new Html5Qrcode("reader");
+  await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
 }
 async function stopScanner(){
-  if(!scanner)return;
-  await scanner.stop(); await scanner.clear();
-  scanner=null; reader.textContent="Camera stopped";
-  startBtn.disabled=false; stopBtn.disabled=true;
+  if (!scanner) return;
+  await scanner.stop();
+  await scanner.clear();
+  scanner = null;
+  reader.textContent = "Camera stopped";
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
 }
+
 async function onScan(text){
+  if (scanLock) return;
+  scanLock = true;
   await stopScanner();
-  const id=text.trim().toUpperCase();
-  const ok=await db.collection("allowed_ids").doc(id).get();
-  if(!ok.exists){ showScan("Invalid ID"); return; }
 
-  const ref=db.collection("meal_records").doc(id);
-  const snap=await ref.get();
-  const today=new Date().toISOString().split("T")[0];
-  let meals=snap.exists?snap.data().meals||{}:{};
+  const id = text.trim().toUpperCase();
+  const ok = await db.collection("allowed_ids").doc(id).get();
+  if (!ok.exists) { showScan("Invalid ID"); return; }
 
-  if(meals[currentMeal]?.date===today){
+  const ref = db.collection("meal_records").doc(id);
+  const snap = await ref.get();
+  const today = todayIST();
+  const meals = snap.exists ? snap.data().meals || {} : {};
+
+  if (meals[currentMeal]?.date === today) {
     showScan("Already Taken");
-  }else{
-    meals[currentMeal]={date:today,time:new Date().toLocaleTimeString()};
-    await ref.set({id,meals},{merge:true});
+  } else {
+    meals[currentMeal] = {
+      date: today,
+      time: new Date().toLocaleTimeString("en-IN")
+    };
+    await ref.set({ id, meals }, { merge: true });
     showScan("Allowed");
   }
 }
 
 /* MODALS */
-function showScan(t){ scanText.textContent=t; scanModal.classList.remove("hidden"); }
-function closeScanModal(){ scanModal.classList.add("hidden"); startScanner(); }
-
+function showScan(t){ scanText.textContent = t; scanModal.classList.remove("hidden"); }
+function closeScanModal(){
+  scanModal.classList.add("hidden");
+  setTimeout(() => scanLock = false, 1500);
+  startScanner();
+}
 function openReport(){ reportModal.classList.remove("hidden"); }
 function closeReport(){ reportModal.classList.add("hidden"); }
+
 async function downloadReport(type){
   closeReport();
-  const s=await db.collection("meal_records").get();
-  const rows=[];
-  s.forEach(d=>{
-    const m=d.data().meals||{};
-    Object.keys(m).forEach(k=>{
-      if(type==="today" && m[k].date!==new Date().toISOString().split("T")[0])return;
-      rows.push({ID:d.id,Meal:k,Date:m[k].date,Time:m[k].time});
+  const s = await db.collection("meal_records").get();
+  const rows = [];
+  const today = todayIST();
+
+  s.forEach(d => {
+    const m = d.data().meals || {};
+    Object.keys(m).forEach(k => {
+      if (type === "today" && m[k].date !== today) return;
+      rows.push({ ID: d.id, Meal: k, Date: m[k].date, Time: m[k].time });
     });
   });
-  if(!rows.length){alert("No data");return;}
-  const ws=XLSX.utils.json_to_sheet(rows);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Report");
-  XLSX.writeFile(wb,`meal_report_${type}.xlsx`);
+
+  if (!rows.length) { alert("No data"); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, `meal_report_${type}.xlsx`);
 }
 </script>
 </body>
 </html>
-
